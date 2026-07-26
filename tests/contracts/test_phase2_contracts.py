@@ -174,10 +174,17 @@ class TestPhase2ErrorHandling:
         # Either succeeds (provider available) or fails gracefully
         assert isinstance(r, ToolResult)
 
-    def test_diagram_gen_empty_boxes(self):
+    def test_diagram_gen_empty_boxes(self, tmp_path):
         tool = DiagramGen()
         if tool.get_status() == ToolStatus.AVAILABLE:
-            r = tool.execute({"diagram_type": "boxes", "boxes": []})
+            # Must pass output_path: DiagramGen defaults to a bare "diagram.png",
+            # which resolves against cwd and overwrites the tracked diagram.png
+            # at the repo root on every test run.
+            r = tool.execute({
+                "diagram_type": "boxes",
+                "boxes": [],
+                "output_path": str(tmp_path / "empty.png"),
+            })
             assert isinstance(r, ToolResult)
 
 
