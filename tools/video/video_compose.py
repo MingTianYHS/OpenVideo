@@ -1700,35 +1700,7 @@ class VideoCompose(BaseTool):
         # Deep-copy props so we don't mutate the original
         props = json.loads(json.dumps(composition_data))
 
-        # Convert absolute file paths to file:// URIs for Remotion's
-        # Img and OffthreadVideo components
-        for cut in props.get("cuts", []):
-            source = cut.get("source", "")
-            if source and not source.startswith(("http://", "https://", "file://")):
-                resolved = Path(source).resolve()
-                if resolved.exists():
-                    posix = resolved.as_posix()
-                    cut["source"] = f"file:///{posix}" if not posix.startswith("/") else f"file://{posix}"
-
-        # Build a custom themeConfig from the playbook's actual colors.
-        # This ensures every video gets a unique visual identity derived
-        # from its production decisions — not picked from a preset menu.
-        if "themeConfig" not in props:
-            playbook_name = (
-                props.get("playbook")
-                or props.get("theme")
-                or props.get("metadata", {}).get("playbook")
-            )
-            theme_config = self._build_theme_from_playbook(playbook_name, composition_data)
-            if theme_config:
-                props["themeConfig"] = theme_config
-
-        # Write props to temp file for Remotion CLI
-        props_path = output_path.parent / ".remotion_props.json"
-        with open(props_path, "w", encoding="utf-8") as f:
-            json.dump(props, f)
-
-        # remotion-composer lives at project root
+        # remotion-composer lives at project root (needed before staging)
         composer_dir = Path(__file__).resolve().parent.parent.parent / "remotion-composer"
         if not composer_dir.exists():
             return ToolResult(
@@ -1736,50 +1708,102 @@ class VideoCompose(BaseTool):
                 error=f"Remotion composer project not found at {composer_dir}",
             )
 
-        # Route to the correct Remotion composition based on renderer_family.
-        # This prevents all pipelines from collapsing into the Explainer visual grammar.
-        renderer_family = (composition_data or {}).get("renderer_family", "explainer-data")
-        composition_id = self._get_composition_id(renderer_family)
+        # Stage local image/audio into a render-scoped --public-dir so
+        # Remotion's staticFile() can serve them. Headless Chromium blocks
+        # file:// for <Audio>. Never write into shared remotion-composer/public/.
+        # The public dir is unique per render (remotion-public-<id>) so concurrent
+        # renders in the same project never collide and cleanup only removes ours.
+        from lib.remotion_asset_staging import (
+            cleanup_staging_dir,
+            derive_staging_slug,
+            resolve_project_public_dir,
+            stage_local_assets_for_remotion,
+        )
 
-        cmd = [
-            "npx", "remotion", "render",
-            str(composer_dir / "src" / "index.tsx"),
-            composition_id,
-            str(output_path),
-            # Use the `--props=<path>` equals form rather than two separate
-            # args. On Windows, passing `--props` and the path separately makes
-            # Remotion mis-parse the value (quote escaping differs), failing
-            # with "neither valid JSON nor a file path". The equals form is the
-            # API Remotion recommends for file paths and is cross-platform safe.
-            f"--props={props_path}",
-        ]
-
-        # Apply media profile dimensions
-        profile_name = inputs.get("profile")
-        if profile_name:
-            try:
-                from lib.media_profiles import get_profile
-                p = get_profile(profile_name)
-                cmd.extend(["--width", str(p.width), "--height", str(p.height)])
-            except (ImportError, ValueError):
-                pass
-
-        # Optional creator-facing render timeout. Remotion's `--timeout` (ms)
-        # governs headless-browser setup and delayRender(); on slow machines or
-        # restricted networks the default 30s browser setup times out with an
-        # opaque failure. Pass it through and give the subprocess enough headroom
-        # so run_command() does not kill Remotion before its own timeout fires.
-        remotion_timeout_ms = inputs.get("remotion_timeout_ms")
-        subprocess_timeout = 600
-        if remotion_timeout_ms:
-            try:
-                ms = int(remotion_timeout_ms)
-                cmd.append(f"--timeout={ms}")
-                subprocess_timeout = max(subprocess_timeout, ms // 1000 + 60)
-            except (TypeError, ValueError):
-                pass
+        project_slug = derive_staging_slug(output_path, props)
+        public_dir = resolve_project_public_dir(output_path, props)
+        # Path objects only (no I/O yet) — defined before try so the finally can
+        # always clean up even if staging/setup fails partway through.
+        props_path = output_path.parent / ".remotion_props.json"
+        staging_report_path = output_path.parent / ".remotion_asset_staging.json"
+        staging_report: dict[str, Any] | None = None
+        phase = "staging"
 
         try:
+            staging_report = stage_local_assets_for_remotion(
+                props,
+                public_dir=public_dir,
+                project_slug=project_slug,
+                mirror_from=composer_dir / "public",
+            )
+            props.setdefault("metadata", {})["remotion_asset_staging"] = staging_report
+            # Persist report next to the render so debug evidence survives media cleanup.
+            with open(staging_report_path, "w", encoding="utf-8") as f:
+                json.dump(staging_report, f, indent=2)
+
+            # Build a custom themeConfig from the playbook's actual colors.
+            # This ensures every video gets a unique visual identity derived
+            # from its production decisions — not picked from a preset menu.
+            if "themeConfig" not in props:
+                playbook_name = (
+                    props.get("playbook")
+                    or props.get("theme")
+                    or props.get("metadata", {}).get("playbook")
+                )
+                theme_config = self._build_theme_from_playbook(playbook_name, composition_data)
+                if theme_config:
+                    props["themeConfig"] = theme_config
+
+            # Write props to temp file for Remotion CLI
+            with open(props_path, "w", encoding="utf-8") as f:
+                json.dump(props, f)
+
+            # Route to the correct Remotion composition based on renderer_family.
+            # This prevents all pipelines from collapsing into the Explainer visual grammar.
+            renderer_family = (composition_data or {}).get("renderer_family", "explainer-data")
+            composition_id = self._get_composition_id(renderer_family)
+
+            cmd = [
+                "npx", "remotion", "render",
+                str(composer_dir / "src" / "index.tsx"),
+                composition_id,
+                str(output_path),
+                # Use the `--props=<path>` equals form rather than two separate
+                # args. On Windows, passing `--props` and the path separately makes
+                # Remotion mis-parse the value (quote escaping differs), failing
+                # with "neither valid JSON nor a file path". The equals form is the
+                # API Remotion recommends for file paths and is cross-platform safe.
+                f"--props={props_path}",
+                # Render-scoped public dir (not remotion-composer/public).
+                f"--public-dir={public_dir.resolve()}",
+            ]
+
+            # Apply media profile dimensions
+            profile_name = inputs.get("profile")
+            if profile_name:
+                try:
+                    from lib.media_profiles import get_profile
+                    p = get_profile(profile_name)
+                    cmd.extend(["--width", str(p.width), "--height", str(p.height)])
+                except (ImportError, ValueError):
+                    pass
+
+            # Optional creator-facing render timeout. Remotion's `--timeout` (ms)
+            # governs headless-browser setup and delayRender(); on slow machines or
+            # restricted networks the default 30s browser setup times out with an
+            # opaque failure. Pass it through and give the subprocess enough headroom
+            # so run_command() does not kill Remotion before its own timeout fires.
+            remotion_timeout_ms = inputs.get("remotion_timeout_ms")
+            subprocess_timeout = 600
+            if remotion_timeout_ms:
+                try:
+                    ms = int(remotion_timeout_ms)
+                    cmd.append(f"--timeout={ms}")
+                    subprocess_timeout = max(subprocess_timeout, ms // 1000 + 60)
+                except (TypeError, ValueError):
+                    pass
+
+            phase = "render"
             # Invoke from inside the composer dir so npx can resolve the
             # local remotion binary via node_modules/.bin. Without this,
             # Windows npx cannot locate the CLI and returns "could not
@@ -1793,21 +1817,26 @@ class VideoCompose(BaseTool):
             tail = "\n".join(detail.splitlines()[-25:]) if detail else "(no output captured)"
             return ToolResult(
                 success=False,
-                error=f"Remotion render failed (exit {e.returncode}):\n{tail}",
+                error=f"Remotion {phase} failed (exit {e.returncode}):\n{tail}",
             )
         except subprocess.TimeoutExpired as e:
             return ToolResult(
                 success=False,
                 error=(
-                    f"Remotion render timed out after {e.timeout}s. If the headless "
+                    f"Remotion {phase} timed out after {e.timeout}s. If the headless "
                     "browser is slow to start, raise remotion_timeout_ms (ms)."
                 ),
             )
         except Exception as e:
-            return ToolResult(success=False, error=f"Remotion render failed: {e}")
+            return ToolResult(success=False, error=f"Remotion {phase} failed: {e}")
         finally:
             if props_path.exists():
                 props_path.unlink()
+            # Remove the render-scoped staged user media we created; keep
+            # .remotion_asset_staging.json for debug. Guarding the whole
+            # staging/setup/render lifetime here means a pre-render failure
+            # (e.g. a copy error after the dir was created) still cleans up.
+            cleanup_staging_dir(public_dir)
 
         if not output_path.exists():
             return ToolResult(
@@ -1821,8 +1850,10 @@ class VideoCompose(BaseTool):
                 "operation": "remotion_render",
                 "output": str(output_path),
                 "profile": profile_name,
+                "remotion_asset_staging": staging_report or {},
+                "remotion_asset_staging_report": str(staging_report_path),
             },
-            artifacts=[str(output_path)],
+            artifacts=[str(output_path), str(staging_report_path)],
         )
 
     # ------------------------------------------------------------------
