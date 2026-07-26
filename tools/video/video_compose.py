@@ -698,6 +698,57 @@ class VideoCompose(BaseTool):
         "animation-first": "Explainer",
     }
 
+    # Families whose composition is CinematicRenderer, which renders from
+    # scenes[] rather than the cut schema the edit_decisions artifact stores.
+    CUT_SCHEMA_CINEMATIC_FAMILIES = frozenset({"cinematic-trailer", "documentary-montage"})
+
+    # Cut transitions that should become a fade on the adapted scene.
+    _CINEMATIC_FADE_TRANSITIONS = frozenset({"fade", "dissolve", "slow dissolve"})
+
+    # Frames of fade applied per side when a cut requests one, at the 30fps
+    # CinematicRenderer timebase (0.4s — matches the schema's default
+    # transition_duration).
+    _CINEMATIC_FADE_FRAMES = 12
+
+    @classmethod
+    def _cuts_to_cinematic_scenes(cls, cuts: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """Adapt cut-schema timeline entries to CinematicVideoScene[].
+
+        CinematicRenderer reads ``props.scenes``; the canonical edit_decisions
+        artifact stores its timeline as ``cuts[]``. Scenes are laid end to end
+        on the timeline, each trimmed to its cut's in/out window.
+
+        Cuts without a source or without a positive duration are dropped —
+        they cannot produce a renderable scene.
+        """
+        scenes: list[dict[str, Any]] = []
+        cursor = 0.0
+        for cut in cuts:
+            source = cut.get("source")
+            if not source:
+                continue
+            try:
+                in_seconds = float(cut.get("in_seconds", 0))
+                duration = float(cut.get("out_seconds", 0)) - in_seconds
+            except (TypeError, ValueError):
+                continue
+            if duration <= 0:
+                continue
+            fade = cls._CINEMATIC_FADE_FRAMES
+            scenes.append({
+                "id": cut.get("id") or f"scene-{len(scenes) + 1}",
+                "kind": "video",
+                "src": source,
+                "startSeconds": cursor,
+                "durationSeconds": duration,
+                "trimBeforeSeconds": in_seconds,
+                "tone": cut.get("tone") or "neutral",
+                "fadeInFrames": fade if cut.get("transition_in") in cls._CINEMATIC_FADE_TRANSITIONS else 0,
+                "fadeOutFrames": fade if cut.get("transition_out") in cls._CINEMATIC_FADE_TRANSITIONS else 0,
+            })
+            cursor += duration
+        return scenes
+
     @classmethod
     def _get_composition_id(cls, renderer_family: str) -> str:
         """Resolve renderer_family to Remotion composition ID.
@@ -1700,15 +1751,52 @@ class VideoCompose(BaseTool):
         # Deep-copy props so we don't mutate the original
         props = json.loads(json.dumps(composition_data))
 
-        # Convert absolute file paths to file:// URIs for Remotion's
-        # Img and OffthreadVideo components
+        # Local media must be staged into remotion-composer/public/ rather than
+        # handed to Remotion as file:// URIs. OffthreadVideo routes frame
+        # extraction through the compositor proxy, which hard-rejects anything
+        # that is not http(s):
+        #
+        #   Can only download URLs starting with http:// or https://,
+        #   got "file:///.../clip.mp4"
+        #
+        # (reproduced on Remotion 4.0.484). <Img> does accept file://, which is
+        # why the previous conversion looked correct for still-image
+        # compositions while breaking every video-backed one. Staging yields
+        # staticFile()-compatible relative paths, which both components accept.
+        composer_dir = Path(__file__).resolve().parent.parent.parent / "remotion-composer"
+        public_dir = composer_dir / "public"
+        staged_root = public_dir / "openmontage_assets" / output_path.stem
+
+        def _stage_for_remotion(value: Any) -> str:
+            src = str(value)
+            if src.startswith(("http://", "https://", "data:")):
+                return src
+            local = Path(src[len("file://"):] if src.startswith("file://") else src)
+            if not local.is_absolute():
+                local = local.resolve()
+            if not local.exists():
+                # Leave unresolvable sources untouched so the pre-compose
+                # validation gate reports them instead of this helper.
+                return src
+            staged_root.mkdir(parents=True, exist_ok=True)
+            target = staged_root / local.name
+            if target.exists() or target.is_symlink():
+                target.unlink()
+            shutil.copy2(local, target)
+            return target.relative_to(public_dir).as_posix()
+
         for cut in props.get("cuts", []):
             source = cut.get("source", "")
-            if source and not source.startswith(("http://", "https://", "file://")):
-                resolved = Path(source).resolve()
-                if resolved.exists():
-                    posix = resolved.as_posix()
-                    cut["source"] = f"file:///{posix}" if not posix.startswith("/") else f"file://{posix}"
+            if source:
+                cut["source"] = _stage_for_remotion(source)
+
+        # CinematicRenderer renders from props.scenes, but the canonical
+        # edit_decisions artifact stores its timeline as cuts[]. Without this
+        # adapter the composition falls back to defaultProps.scenes = [] and
+        # emits a fixed 30s black video while still reporting success (#358).
+        renderer_family = (composition_data or {}).get("renderer_family")
+        if renderer_family in self.CUT_SCHEMA_CINEMATIC_FAMILIES and not props.get("scenes"):
+            props["scenes"] = self._cuts_to_cinematic_scenes(props.get("cuts", []))
 
         # Build a custom themeConfig from the playbook's actual colors.
         # This ensures every video gets a unique visual identity derived
