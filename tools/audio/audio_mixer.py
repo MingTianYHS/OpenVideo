@@ -184,6 +184,17 @@ class AudioMixer(BaseTool):
                 "default": 0.5,
                 "description": "Duration of fade in/out at segment boundaries (seconds).",
             },
+            "target_duration": {
+                "type": "number",
+                "minimum": 0,
+                "description": (
+                    "full_mix only. Exact output length in seconds. When set, the "
+                    "mix is padded with silence and trimmed to this duration, so the "
+                    "output matches the video cut regardless of which bus survives "
+                    "the ducking graph. When omitted, output length follows the "
+                    "longest surviving bus, which sidechain ducking can shorten."
+                ),
+            },
         },
     }
 
@@ -596,12 +607,28 @@ class AudioMixer(BaseTool):
                 f"{all_labels}amix=inputs={len(all_tracks)}:duration=longest:dropout_transition=2[premix]"
             )
 
+        # Enforce an exact composition length when the caller states one. The
+        # ducking graph's final amix uses duration=longest, but the ducked-music
+        # branch is gated behind the speech sidechain, so "longest" tracks the
+        # speech bus and the music tail past the last narration is dropped. Pad
+        # with silence then hard-trim so the output is exactly target_duration —
+        # apad extends a short mix, atrim caps a long one. Done before loudnorm
+        # so the trailing silence is shaped by the same normalization pass.
+        premix_label = "premix"
+        target_duration = inputs.get("target_duration")
+        if target_duration is not None:
+            target = float(target_duration)
+            filter_parts.append(
+                f"[premix]apad,atrim=0:{target},asetpts=PTS-STARTPTS[premix_dur]"
+            )
+            premix_label = "premix_dur"
+
         # Normalize
         if normalize:
-            filter_parts.append(self._loudnorm_filter(inputs, "premix", "out"))
+            filter_parts.append(self._loudnorm_filter(inputs, premix_label, "out"))
             out_label = "[out]"
         else:
-            out_label = "[premix]"
+            out_label = f"[{premix_label}]"
 
         filter_complex = ";".join(p for p in filter_parts if p)
 
@@ -621,6 +648,7 @@ class AudioMixer(BaseTool):
                 "sfx_tracks": len(sfx_tracks),
                 "ducking_enabled": duck_enabled,
                 "normalized": normalize,
+                "target_duration": target_duration,
                 "output": str(output_path),
             },
             artifacts=[str(output_path)],
