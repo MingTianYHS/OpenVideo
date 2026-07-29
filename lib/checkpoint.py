@@ -227,6 +227,64 @@ def init_project(
     return project_dir
 
 
+def _check_stage_prerequisites(
+    pipeline_dir: Path,
+    project_id: str,
+    stage: str,
+    status: str,
+    pipeline_type: Optional[str],
+) -> None:
+    """Raise CheckpointValidationError if prerequisite stages are not completed.
+
+    Enforced when status is 'awaiting_human' or 'completed' — the two states
+    that indicate a stage is actually executing. 'in_progress' writes are
+    exempt so incremental heartbeats don't require all prior stages to finish.
+
+    Only enforced when pipeline_type is known (so the manifest-driven stage
+    order is available). If the manifest cannot be loaded the check is skipped
+    rather than blocking a valid run — degradation must be visible via the
+    existing load-failure warning in get_pipeline_stages().
+    """
+    if status == "in_progress":
+        return
+    if not pipeline_type or pipeline_type == "unknown":
+        return
+
+    try:
+        stages = get_pipeline_stages(pipeline_type)
+    except Exception:
+        return  # Manifest unavailable — skip silently (warning already logged)
+
+    if stage not in stages:
+        return  # Unknown stage for this pipeline — let later validation catch it
+
+    stage_index = stages.index(stage)
+    if stage_index == 0:
+        return  # First stage has no prerequisites
+
+    missing = []
+    for prior_stage in stages[:stage_index]:
+        path = _checkpoint_path(pipeline_dir, project_id, prior_stage)
+        if not path.exists():
+            missing.append(prior_stage)
+            continue
+        try:
+            with open(path) as f:
+                prior = json.load(f)
+            if prior.get("status") != "completed":
+                missing.append(prior_stage)
+        except (json.JSONDecodeError, OSError):
+            missing.append(prior_stage)
+
+    if missing:
+        raise CheckpointValidationError(
+            f"PREREQUISITE VIOLATION: stage {stage!r} cannot proceed — "
+            f"the following stages must be completed first: {missing}. "
+            f"Pipeline order for {pipeline_type!r}: {stages}. "
+            f"Complete the missing stages in order before writing {stage!r}."
+        )
+
+
 def _stage_requires_approval(pipeline_type: Optional[str], stage: str) -> Optional[bool]:
     """Read human_approval_default for a stage from its pipeline manifest.
 
@@ -374,6 +432,12 @@ def write_checkpoint(
             f"Invalid stage: {stage!r} for pipeline {pipeline_type!r}. "
             f"Valid stages: {sorted(valid_stages)}"
         )
+
+    # --- Prerequisite stage enforcement ---
+    # Ensures stages run in declared pipeline order. A stage cannot be written
+    # as awaiting_human or completed unless all prior stages have completed
+    # checkpoints. in_progress writes are exempt (heartbeats/partial progress).
+    _check_stage_prerequisites(pipeline_dir, project_id, stage, status, pipeline_type)
 
     # --- Gate enforcement (GI-4) ---
     # The pipeline manifest is the binding source of truth for whether a stage
