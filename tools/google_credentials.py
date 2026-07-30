@@ -38,8 +38,13 @@ def has_google_credentials() -> bool:
     )
 
 
-def get_genai_client(http_options: Any | None = None) -> Any:
-    """Lazily import and initialize the Google GenAI Client based on configured credentials."""
+def get_genai_client(http_options: Any | None = None, location: str | None = None) -> Any:
+    """Lazily import and initialize the Google GenAI Client based on configured credentials.
+
+    ``location`` overrides the Vertex region for models that are only served
+    from a specific location (e.g. Lyria 3 requires ``global``). It is ignored
+    on the API-key path, which has no region concept.
+    """
     from google import genai
 
     api_key = os.environ.get("GOOGLE_API_KEY") or os.environ.get("GEMINI_API_KEY")
@@ -51,7 +56,8 @@ def get_genai_client(http_options: Any | None = None) -> Any:
     if use_vertex or (not api_key and service_account_configured()):
         kwargs = {
             "vertexai": True,
-            "location": os.environ.get("GOOGLE_CLOUD_LOCATION", "us-central1"),
+            "location": location
+            or os.environ.get("GOOGLE_CLOUD_LOCATION", "us-central1"),
             "http_options": http_options,
         }
         project_id = resolve_project_id()
