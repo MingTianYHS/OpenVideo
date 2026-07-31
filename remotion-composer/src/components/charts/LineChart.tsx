@@ -53,13 +53,22 @@ export const LineChart: React.FC<LineChartProps> = ({
   strokeWidth = 3,
 }) => {
   const frame = useCurrentFrame();
-  const { fps, durationInFrames } = useVideoConfig();
+  const { fps, durationInFrames, width, height } = useVideoConfig();
 
-  // Chart layout
-  const chartLeft = 160;
-  const chartRight = 1760;
-  const chartTop = title ? 160 : 100;
-  const chartBottom = showLegend ? 880 : 940;
+  // Legend only renders for multi-series charts; don't reserve space otherwise.
+  const legendVisible = showLegend && series.length > 1;
+
+  // Chart layout — derived from the actual canvas so the chart fills any
+  // orientation (16:9, 9:16, square) instead of a hardcoded 1920x1080 viewBox
+  // that SVG aspect-preservation would shrink and letterbox on a portrait frame.
+  const centerX = width / 2;
+  const marginX = Math.round(width * 0.1);
+  const chartLeft = marginX + Math.round(width * 0.037); // extra room for y-axis ticks
+  const chartRight = width - marginX;
+  const titleY = Math.round(height * 0.06);
+  const chartTop = Math.round(height * (title ? 0.16 : 0.1));
+  const chartBottom = Math.round(height * (legendVisible ? 0.82 : 0.88));
+  const legendY = Math.round(height * 0.9);
   const chartWidth = chartRight - chartLeft;
   const chartHeight = chartBottom - chartTop;
 
@@ -108,14 +117,14 @@ export const LineChart: React.FC<LineChartProps> = ({
       }}
     >
       <svg
-        viewBox="0 0 1920 1080"
+        viewBox={`0 0 ${width} ${height}`}
         style={{ width: "100%", height: "100%" }}
       >
         {/* Title */}
         {title && (
           <text
-            x={960}
-            y={80}
+            x={centerX}
+            y={titleY}
             textAnchor="middle"
             fill={textColor}
             fontFamily={fontFamily}
@@ -339,7 +348,7 @@ export const LineChart: React.FC<LineChartProps> = ({
         })}
 
         {/* Legend */}
-        {showLegend && series.length > 1 && (
+        {legendVisible && (
           <g
             opacity={interpolate(frame, [15, 25], [0, 1], {
               extrapolateLeft: "clamp",
@@ -348,12 +357,12 @@ export const LineChart: React.FC<LineChartProps> = ({
           >
             {series.map((s, i) => {
               const color = s.color || colors[i % colors.length];
-              const legendX = 960 - (series.length * 160) / 2 + i * 160;
+              const legendX = centerX - (series.length * 160) / 2 + i * 160;
               return (
                 <g key={`legend-${i}`}>
                   <rect
                     x={legendX}
-                    y={960}
+                    y={legendY}
                     width={24}
                     height={4}
                     rx={2}
@@ -361,7 +370,7 @@ export const LineChart: React.FC<LineChartProps> = ({
                   />
                   <text
                     x={legendX + 32}
-                    y={966}
+                    y={legendY + 6}
                     fill={textColor}
                     fontFamily={fontFamily}
                     fontSize={20}

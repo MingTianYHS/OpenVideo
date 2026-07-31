@@ -597,12 +597,14 @@ const SceneRenderer: React.FC<{ cut: Cut; theme: ThemeConfig }> = ({ cut, theme 
         leftLabel={cut.leftLabel} rightLabel={cut.rightLabel}
         leftValue={cut.leftValue} rightValue={cut.rightValue}
         title={cut.title} backgroundColor={bgColor} textColor={textColor}
+        cardBackgroundColor={cut.backgroundColor && cut.backgroundColor !== theme.backgroundColor ? cut.backgroundColor : theme.surfaceColor}
       />
     );
   }
   if (cut.type === "hero_title" && cut.text) {
     return maybeWrapWithBg(
-      <HeroTitle title={cut.text} subtitle={cut.heroSubtitle || cut.subtitle} />
+      <HeroTitle title={cut.text} subtitle={cut.heroSubtitle || cut.subtitle}
+        accentColor={accent} textColor={theme.textColor} subtitleColor={theme.mutedTextColor} />
     );
   }
   if (cut.type === "terminal_scene" && cut.steps) {
@@ -645,6 +647,7 @@ const SceneRenderer: React.FC<{ cut: Cut; theme: ThemeConfig }> = ({ cut, theme 
         animationStyle={(cut.chartAnimation as any) || "draw"}
         showGrid={cut.showGrid} showMarkers={cut.showMarkers} showLegend={cut.showLegend}
         xLabel={cut.xLabel} yLabel={cut.yLabel} backgroundColor={bgColor}
+        textColor={theme.textColor} gridColor={theme.mutedTextColor}
       />
     );
   }

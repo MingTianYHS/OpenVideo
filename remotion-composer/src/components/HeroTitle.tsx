@@ -9,9 +9,18 @@ import {
 interface HeroTitleProps {
   title: string;
   subtitle?: string;
+  accentColor?: string;
+  textColor?: string;
+  subtitleColor?: string;
 }
 
-export const HeroTitle: React.FC<HeroTitleProps> = ({ title, subtitle }) => {
+export const HeroTitle: React.FC<HeroTitleProps> = ({
+  title,
+  subtitle,
+  accentColor = "#22D3EE",
+  textColor = "#F8FAFC",
+  subtitleColor = "#A78BFA",
+}) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
@@ -56,7 +65,7 @@ export const HeroTitle: React.FC<HeroTitleProps> = ({ title, subtitle }) => {
                   display: "inline-block",
                   opacity: charSpring,
                   transform: `translateY(${interpolate(charSpring, [0, 1], [30, 0])}px)`,
-                  color: i < 8 ? "#22D3EE" : "#F8FAFC", // Accent first word
+                  color: i < 8 ? accentColor : textColor, // Accent first word
                   whiteSpace: char === " " ? "pre" : undefined,
                   minWidth: char === " " ? "0.3em" : undefined,
                 }}
@@ -79,7 +88,7 @@ export const HeroTitle: React.FC<HeroTitleProps> = ({ title, subtitle }) => {
               }),
               fontSize: 28,
               fontWeight: 400,
-              color: "#A78BFA",
+              color: subtitleColor,
               fontFamily: "Space Grotesk, Inter, system-ui, sans-serif",
               letterSpacing: "0.1em",
               textTransform: "uppercase",
@@ -94,7 +103,7 @@ export const HeroTitle: React.FC<HeroTitleProps> = ({ title, subtitle }) => {
           style={{
             margin: "24px auto 0",
             height: 3,
-            backgroundColor: "#22D3EE",
+            backgroundColor: accentColor,
             borderRadius: 2,
             width: interpolate(
               spring({

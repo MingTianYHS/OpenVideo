@@ -1,4 +1,8 @@
 <p align="center">
+  <img src="assets/logo.png" alt="Balamonis Studio" width="200">
+</p>
+
+<h1 align="center">Balamonis Studio</h1>
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="assets/monty-dark.svg">
     <img src="assets/monty-light.svg" alt="Monty the Clapper — the official mascot of OpenMontage" width="200">
@@ -10,6 +14,8 @@
 <h1 align="center">OpenMontage</h1>
 
 <p align="center"><strong>The first open-source, agentic video production system.</strong></p>
+
+<p align="center"><em>Balamonis Studio is built on the open-source <a href="https://github.com/calesthio/OpenMontage">OpenMontage</a> project.</em></p>
 
 <p align="center">
   <a href="https://openmontage.video"><img src="https://img.shields.io/badge/Website-openmontage.video-d14a28?style=for-the-badge" alt="openmontage.video"></a>
@@ -72,13 +78,13 @@
 
 Turn your AI coding assistant into a full video production studio. Describe what you want in plain language — your agent handles research, scripting, asset generation, editing, and final composition.
 
-**Important distinction:** OpenMontage can make image-based videos, but it can also make a real **video video** for free/open-source workflows: the agent builds a corpus from free stock footage and open archives, retrieves actual motion clips, edits them into a timeline, and renders a finished piece. That is not the usual "animate a handful of stills and call it video" trick.
+**Important distinction:** Balamonis Studio can make image-based videos, but it can also make a real **video video** for free/open-source workflows: the agent builds a corpus from free stock footage and open archives, retrieves actual motion clips, edits them into a timeline, and renders a finished piece. That is not the usual "animate a handful of stills and call it video" trick.
 
 <div align="center">
   <video src="https://github.com/user-attachments/assets/f77ce7a4-68b8-4f94-a287-e94bf50a32e1" width="100%" controls></video>
 </div>
 
-> **"SIGNAL FROM TOMORROW"** — a cinematic sci-fi trailer fully produced through OpenMontage: concept, script, scene plan, Veo-generated motion clips, soundtrack, and Remotion composition.
+> **"SIGNAL FROM TOMORROW"** — a cinematic sci-fi trailer fully produced through Balamonis Studio: concept, script, scene plan, Veo-generated motion clips, soundtrack, and Remotion composition.
 
 <div align="center">
   <video src="https://github.com/user-attachments/assets/8daca07f-cdf8-4bec-89c3-9dc2176363fa" width="100%" controls></video>
@@ -90,7 +96,7 @@ Turn your AI coding assistant into a full video production studio. Describe what
   <video src="https://github.com/user-attachments/assets/e03b5d1f-1199-4093-9f31-a43aa9da2c68" width="100%" controls></video>
 </div>
 
-> **"The Library at Alexandria"** — a 70-second history elegy on what humanity lost in a single night. Five hand-authored scenes — an illuminated manuscript page, cascading scroll-tags, a Burning Counter ticking 700,000 → 0 inside a candle's flame, a charred vellum fragment with surviving Greek, and an empty void — set to OpenAI 'ash' narration and a free Pixabay strings score. Total cost: **$0.02**. Built through OpenMontage's atelier (bespoke) composition mode — every scene crafted from scratch, no shared components.
+> **"The Library at Alexandria"** — a 70-second history elegy on what humanity lost in a single night. Five hand-authored scenes — an illuminated manuscript page, cascading scroll-tags, a Burning Counter ticking 700,000 → 0 inside a candle's flame, a charred vellum fragment with surviving Greek, and an empty void — set to OpenAI 'ash' narration and a free Pixabay strings score. Total cost: **$0.02**. Built through Balamonis Studio's atelier (bespoke) composition mode — every scene crafted from scratch, no shared components.
 
 <div align="center">
   <video src="https://github.com/user-attachments/assets/8a6d2cc3-7ad2-46f5-922f-a8e3e5848d9f" width="100%" controls></video>
@@ -120,7 +126,7 @@ Turn your AI coding assistant into a full video production studio. Describe what
 
 Starting from a reference video is often faster than starting from a blank prompt.
 
-OpenMontage can start from a **YouTube video, Short, Reel, TikTok, or local clip** and turn it into a grounded production plan:
+Balamonis Studio can start from a **YouTube video, Short, Reel, TikTok, or local clip** and turn it into a grounded production plan:
 
 1. **Paste a reference video**
 2. **The agent analyzes transcript, pacing, scenes, keyframes, and style**
@@ -184,7 +190,7 @@ And when a run is done, hit **▶ REPLAY RUN** — the whole production replays 
 
 ```bash
 git clone https://github.com/calesthio/OpenMontage.git
-cd OpenMontage
+cd Balamonis Studio
 make setup
 ```
 
@@ -215,7 +221,7 @@ This repo is built for agentic operation. If you're an OpenClaw-style agent, her
 1. **Read the contract first**
    Start with [`AGENT_GUIDE.md`](AGENT_GUIDE.md), then [`PROJECT_CONTEXT.md`](PROJECT_CONTEXT.md).
 2. **Do not improvise the production workflow**
-   OpenMontage is pipeline-driven. Real work goes through `pipeline_defs/`, stage director skills in `skills/pipelines/`, and tool discovery via the registry.
+   Balamonis Studio is pipeline-driven. Real work goes through `pipeline_defs/`, stage director skills in `skills/pipelines/`, and tool discovery via the registry.
 3. **Check the actual capability envelope**
    Run:
    ```bash
@@ -286,7 +292,7 @@ You don't need paid API keys to make real videos. Out of the box, `make setup` g
 | **Post-production** | FFmpeg | Encoding, subtitle burn-in, audio mixing, color grading |
 | **Subtitles** | Built-in | Auto-generated captions with word-level timing |
 
-OpenMontage picks between Remotion and HyperFrames at proposal time (locked as `render_runtime`). Remotion is the default for data-driven explainers and anything using the existing React scene stack; HyperFrames is the default for motion-graphics-heavy briefs that express naturally as HTML + GSAP, including the `character-animation` pipeline's SVG/GSAP rig output. See `skills/core/hyperframes.md` for the full decision matrix.
+Balamonis Studio picks between Remotion and HyperFrames at proposal time (locked as `render_runtime`). Remotion is the default for data-driven explainers and anything using the existing React scene stack; HyperFrames is the default for motion-graphics-heavy briefs that express naturally as HTML + GSAP, including the `character-animation` pipeline's SVG/GSAP rig output. See `skills/core/hyperframes.md` for the full decision matrix.
 
 **Two free-ish paths:**
 
@@ -376,13 +382,13 @@ Each stage has a dedicated **director skill** — a markdown instruction file th
 
 ---
 
-## Why OpenMontage?
+## Why Balamonis Studio?
 
-Most AI video tools give you a single clip from a prompt. OpenMontage gives you an **end-to-end production pipeline** — the same structured process a real production team follows, automated by your AI agent.
+Most AI video tools give you a single clip from a prompt. Balamonis Studio gives you an **end-to-end production pipeline** — the same structured process a real production team follows, automated by your AI agent.
 
-Most "free AI video" stacks quietly mean "animate still images." OpenMontage can do that too, but it can also build a finished video from **real footage** pulled from free/open sources, ranked semantically, edited intentionally, and rendered as a proper timeline.
+Most "free AI video" stacks quietly mean "animate still images." Balamonis Studio can do that too, but it can also build a finished video from **real footage** pulled from free/open sources, ranked semantically, edited intentionally, and rendered as a proper timeline.
 
-Edit your own talking-head footage. Generate a fully animated explainer from scratch. Cut a 2-hour podcast into a dozen social clips. Translate and dub your content into 10 languages. Build a cinematic brand teaser from stock footage and AI-generated scenes. **If a production team can make it, OpenMontage can orchestrate it.**
+Edit your own talking-head footage. Generate a fully animated explainer from scratch. Cut a 2-hour podcast into a dozen social clips. Translate and dub your content into 10 languages. Build a cinematic brand teaser from stock footage and AI-generated scenes. **If a production team can make it, Balamonis Studio can orchestrate it.**
 
 - **12 production pipelines** — explainers, talking heads, screen demos, cinematic trailers, animations, podcasts, localization, documentary montages, and more
 - **100+ production tools** — spanning video generation, image creation, text-to-speech, music, audio mixing, subtitles, enhancement, and analysis
@@ -399,7 +405,7 @@ Edit your own talking-head footage. Generate a fully animated explainer from scr
 
 ## How It Works
 
-OpenMontage uses an **agent-first architecture**. There is no code orchestrator. Your AI coding assistant IS the orchestrator.
+Balamonis Studio uses an **agent-first architecture**. There is no code orchestrator. Your AI coding assistant IS the orchestrator.
 
 ```
 You: "Make an explainer video about how black holes form"
@@ -470,11 +476,11 @@ OpenMontage/
 
 ```
 Layer 1: tools/ + pipeline_defs/     "What exists" — executable capabilities + orchestration
-Layer 2: skills/                     "How to use it" — OpenMontage conventions and quality bars
+Layer 2: skills/                     "How to use it" — Balamonis Studio conventions and quality bars
 Layer 3: .agents/skills/             "How it works" — external technology knowledge packs
 ```
 
-Each tool declares which Layer 3 skills it relies on. The agent reads Layer 1 to know what's available, Layer 2 to know how OpenMontage wants it used, and Layer 3 for deep technical knowledge when needed.
+Each tool declares which Layer 3 skills it relies on. The agent reads Layer 1 to know what's available, Layer 2 to know how Balamonis Studio wants it used, and Layer 3 for deep technical knowledge when needed.
 
 ---
 
@@ -634,7 +640,7 @@ Built-in render profiles for every major platform:
 
 ## Production Governance
 
-OpenMontage treats video production like real engineering — with quality gates, audit trails, and enforcement at every stage.
+Balamonis Studio treats video production like real engineering — with quality gates, audit trails, and enforcement at every stage.
 
 ### Quality Gates
 
@@ -671,7 +677,7 @@ No surprise bills. The agent tells you what it will cost before it spends.
 
 ## Agent Compatibility
 
-OpenMontage works with any AI coding assistant that can read files and execute Python. Dedicated instruction files are included for:
+Balamonis Studio works with any AI coding assistant that can read files and execute Python. Dedicated instruction files are included for:
 
 | Platform | Config File |
 |----------|------------|
@@ -689,7 +695,7 @@ All platform files point to the shared `AGENT_GUIDE.md` (operating guide and age
 
 ## Contributing
 
-OpenMontage is built to be extended. The two most common contributions:
+Balamonis Studio is built to be extended. The two most common contributions:
 
 ### Adding a New Tool
 
@@ -756,8 +762,8 @@ make test
 
 ---
 
-**OpenMontage** — Production-grade video with real quality enforcement, orchestrated by your AI assistant.
+**Balamonis Studio** — Production-grade video with real quality enforcement, orchestrated by your AI assistant.
 
 If this project looks useful to you, a ⭐ would really mean a lot — it helps others discover it too.
 
-If you'd like to go further, [sponsor the project](https://github.com/sponsors/calesthio) — OpenMontage is built nights and weekends, and your support makes that sustainable.
+If you'd like to go further, [sponsor the project](https://github.com/sponsors/calesthio) — Balamonis Studio is built nights and weekends, and your support makes that sustainable.

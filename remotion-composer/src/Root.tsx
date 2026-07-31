@@ -123,13 +123,19 @@ export function resolveTheme(props: Record<string, unknown>): ThemeConfig {
 const calculateMetadata: CalculateMetadataFunction<ExplainerProps> = async ({
   props,
 }) => {
+  // Optional orientation override — lets a single composition render 16:9
+  // (default 1920x1080), 9:16 vertical Shorts (1080x1920), or 1:1 square by
+  // passing `width`/`height` in props. Falls back to the composition defaults.
+  const width = (props.width as number) || undefined;
+  const height = (props.height as number) || undefined;
+  const dims = width && height ? { width, height } : {};
   const cuts = props.cuts || [];
   if (cuts.length === 0) {
-    return { durationInFrames: 30 * 60 };
+    return { durationInFrames: 30 * 60, ...dims };
   }
   const lastEnd = Math.max(...cuts.map((c) => c.out_seconds || 0));
   // Add 1 second padding for final fade
-  return { durationInFrames: Math.ceil((lastEnd + 1) * 30) };
+  return { durationInFrames: Math.ceil((lastEnd + 1) * 30), ...dims };
 };
 
 export const Root: React.FC = () => {

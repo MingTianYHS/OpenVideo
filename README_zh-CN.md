@@ -1,4 +1,8 @@
 <p align="center">
+  <img src="assets/logo.png" alt="Balamonis Studio" width="200">
+</p>
+
+<h1 align="center">Balamonis Studio</h1>
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="assets/monty-dark.svg">
     <img src="assets/monty-light.svg" alt="Monty the Clapper — OpenMontage 官方吉祥物" width="200">
@@ -41,13 +45,13 @@
 
 将您的 AI 编程助手变成一个完整的视频制作工作室。用通俗的语言描述您的需求——您的智能体会自动处理研究、脚本编写、资产生成、剪辑以及最终合成。
 
-**重要的区别：** OpenMontage 可以制作基于图像生成的视频，但它也能为免费/开源工作流制作真正的**原生视频（video video）**：智能体会从免费的免版税素材和开源档案中建立语料库，检索实际的动态画面，将它们剪辑到时间线中，并渲染出成品。这绝非通常那种“让几张静态图片动起来就称为视频”的把戏。
+**重要的区别：** Balamonis Studio 可以制作基于图像生成的视频，但它也能为免费/开源工作流制作真正的**原生视频（video video）**：智能体会从免费的免版税素材和开源档案中建立语料库，检索实际的动态画面，将它们剪辑到时间线中，并渲染出成品。这绝非通常那种“让几张静态图片动起来就称为视频”的把戏。
 
 <div align="center">
   <video src="https://github.com/user-attachments/assets/f77ce7a4-68b8-4f94-a287-e94bf50a32e1" width="100%" controls></video>
 </div>
 
-> **“来自明天的信号 (SIGNAL FROM TOMORROW)”** — 一部完全通过 OpenMontage 制作的电影级科幻预告片：包括概念、剧本、场景规划、Veo 生成的动态片段、配乐以及 Remotion 合成。
+> **“来自明天的信号 (SIGNAL FROM TOMORROW)”** — 一部完全通过 Balamonis Studio 制作的电影级科幻预告片：包括概念、剧本、场景规划、Veo 生成的动态片段、配乐以及 Remotion 合成。
 
 <div align="center">
   <video src="https://github.com/user-attachments/assets/8daca07f-cdf8-4bec-89c3-9dc2176363fa" width="100%" controls></video>
@@ -89,7 +93,7 @@
 
 从参考视频开始通常比从空白提示词开始要快得多。
 
-OpenMontage 可以从 **YouTube 视频、Short、Reel、TikTok 或本地片段**开始，并将其转化为切实可行的制作计划：
+Balamonis Studio 可以从 **YouTube 视频、Short、Reel、TikTok 或本地片段**开始，并将其转化为切实可行的制作计划：
 
 1. **粘贴参考视频**
 2. **智能体会分析文案、节奏、场景、关键帧和风格**
@@ -123,7 +127,7 @@ OpenMontage 可以从 **YouTube 视频、Short、Reel、TikTok 或本地片段**
 
 ```bash
 git clone https://github.com/calesthio/OpenMontage.git
-cd OpenMontage
+cd Balamonis Studio
 make setup
 ```
 
@@ -154,7 +158,7 @@ make setup
 1. **首先阅读契约**
    从 [`AGENT_GUIDE.md`](AGENT_GUIDE.md) 开始，然后是 [`PROJECT_CONTEXT.md`](PROJECT_CONTEXT.md)。
 2. **不要擅自虚构制作工作流**
-   OpenMontage 是流水线驱动的。实际工作通过 `pipeline_defs/` 进行，阶段导演技能在 `skills/pipelines/` 中，工具发现通过 registry（注册表）完成。
+   Balamonis Studio 是流水线驱动的。实际工作通过 `pipeline_defs/` 进行，阶段导演技能在 `skills/pipelines/` 中，工具发现通过 registry（注册表）完成。
 3. **检查实际的能力范围**
    运行：
    ```bash
@@ -220,7 +224,7 @@ VIDEO_GEN_LOCAL_MODEL=wan2.1-1.3b  # 或 wan2.1-14b, hunyuan-1.5, ltx2-local, co
 | **后期制作** | FFmpeg | 编码、字幕烧录、音频混合、色彩调色 |
 | **字幕生成** | 内置 | 带有词级时间轴的自动生成字幕 |
 
-OpenMontage 会在提案阶段在 Remotion 和 HyperFrames 之间进行选择（锁定为 `render_runtime`）。Remotion 是数据驱动解说和任何使用现有 React 场景堆栈内容的默认选择；HyperFrames 则是大量使用动态图形且更自然表达为 HTML + GSAP 的需求的默认选择，包括 `character-animation` 流水线的 SVG/GSAP 绑定输出。详见 `skills/core/hyperframes.md` 了解完整的决策矩阵。
+Balamonis Studio 会在提案阶段在 Remotion 和 HyperFrames 之间进行选择（锁定为 `render_runtime`）。Remotion 是数据驱动解说和任何使用现有 React 场景堆栈内容的默认选择；HyperFrames 则是大量使用动态图形且更自然表达为 HTML + GSAP 的需求的默认选择，包括 `character-animation` 流水线的 SVG/GSAP 绑定输出。详见 `skills/core/hyperframes.md` 了解完整的决策矩阵。
 
 **两条近乎免费的路径：**
 
@@ -310,13 +314,13 @@ OpenMontage 会在提案阶段在 Remotion 和 HyperFrames 之间进行选择（
 
 ---
 
-## 为什么选择 OpenMontage？
+## 为什么选择 Balamonis Studio？
 
-大多数 AI 视频工具仅根据提示词提供单一的剪辑片段。OpenMontage 为您提供了一个 **端到端的制作流水线** — 就像真实制作团队所遵循的结构化流程一样，由您的 AI 智能体自动完成。
+大多数 AI 视频工具仅根据提示词提供单一的剪辑片段。Balamonis Studio 为您提供了一个 **端到端的制作流水线** — 就像真实制作团队所遵循的结构化流程一样，由您的 AI 智能体自动完成。
 
-大多数“免费 AI 视频”技术栈往往暗指“让静态图像动起来”。OpenMontage 固然也能做到这一点，但它还能利用从免费/开源获取的**真实素材**制作完整的视频：在语义上对其进行排名，有目的地进行剪辑，并作为正确的时间线渲染输出。
+大多数“免费 AI 视频”技术栈往往暗指“让静态图像动起来”。Balamonis Studio 固然也能做到这一点，但它还能利用从免费/开源获取的**真实素材**制作完整的视频：在语义上对其进行排名，有目的地进行剪辑，并作为正确的时间线渲染输出。
 
-剪辑您自己的口播素材。从零开始生成一个完全动画化的解说。将长达 2 小时的播客剪辑成十几个社交短片。将您的内容翻译并配音成 10 种语言。用库存影像和 AI 生成的场景构建电影级品牌预告片。**只要制作团队能做出来的东西，OpenMontage 就能编排它。**
+剪辑您自己的口播素材。从零开始生成一个完全动画化的解说。将长达 2 小时的播客剪辑成十几个社交短片。将您的内容翻译并配音成 10 种语言。用库存影像和 AI 生成的场景构建电影级品牌预告片。**只要制作团队能做出来的东西，Balamonis Studio 就能编排它。**
 
 - **12 条生产流水线** — 涵盖解说、口播、屏幕演示、电影预告、动画、播客、本地化和纪录片蒙太奇等
 - **52 种生产工具** — 涵盖视频生成、图像创建、文本转语音、音乐、音频混合、字幕、画面增强和分析
@@ -333,7 +337,7 @@ OpenMontage 会在提案阶段在 Remotion 和 HyperFrames 之间进行选择（
 
 ## 工作原理
 
-OpenMontage 采用 **智能体优先 (agent-first) 的架构**。这里没有代码编排器。您的 AI 编程助手本身就是编排器。
+Balamonis Studio 采用 **智能体优先 (agent-first) 的架构**。这里没有代码编排器。您的 AI 编程助手本身就是编排器。
 
 ```
 您："制作一个关于黑洞是如何形成的解说视频"
@@ -404,11 +408,11 @@ OpenMontage/
 
 ```
 第 1 层: tools/ + pipeline_defs/     "存在什么" — 可执行功能 + 编排
-第 2 层: skills/                     "如何使用它" — OpenMontage 的约定和质量门槛
+第 2 层: skills/                     "如何使用它" — Balamonis Studio 的约定和质量门槛
 第 3 层: .agents/skills/             "如何工作" — 外部技术知识包
 ```
 
-每个工具都会声明其依赖哪些第 3 层技能。智能体读取第 1 层了解有哪些可用工具，读取第 2 层了解 OpenMontage 期望的使用方式，当需要时，读取第 3 层获取深入的技术知识。
+每个工具都会声明其依赖哪些第 3 层技能。智能体读取第 1 层了解有哪些可用工具，读取第 2 层了解 Balamonis Studio 期望的使用方式，当需要时，读取第 3 层获取深入的技术知识。
 
 ---
 
@@ -563,7 +567,7 @@ OpenMontage/
 
 ## 制作治理
 
-OpenMontage 像对待真正的工程开发一样对待视频制作——在每个阶段都设有质量关卡、审计跟踪和执行控制。
+Balamonis Studio 像对待真正的工程开发一样对待视频制作——在每个阶段都设有质量关卡、审计跟踪和执行控制。
 
 ### 质量检验门
 
@@ -599,7 +603,7 @@ OpenMontage 像对待真正的工程开发一样对待视频制作——在每�
 
 ## 智能体兼容性
 
-OpenMontage 兼容所有能够读取文件并执行 Python 的 AI 编程助手。项目中已包含专用的指令文件：
+Balamonis Studio 兼容所有能够读取文件并执行 Python 的 AI 编程助手。项目中已包含专用的指令文件：
 
 | 平台 | 配置文件 |
 |----------|------------|
@@ -617,7 +621,7 @@ OpenMontage 兼容所有能够读取文件并执行 Python 的 AI 编程助手�
 
 ## 参与贡献
 
-OpenMontage 被设计为高度可扩展的。最常见的两种贡献是：
+Balamonis Studio 被设计为高度可扩展的。最常见的两种贡献是：
 
 ### 添加新工具
 
@@ -672,6 +676,6 @@ make test
 
 ---
 
-**OpenMontage** — 拥有真正质量把控、由您的 AI 助手编排的生产级视频制作系统。
+**Balamonis Studio** — 拥有真正质量把控、由您的 AI 助手编排的生产级视频制作系统。
 
 如果这个项目对您有帮助，点一个 Star 对我们意义重大 —— 这也能帮助其他人发现它。

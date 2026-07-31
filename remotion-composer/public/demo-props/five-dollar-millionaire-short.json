@@ -1,0 +1,146 @@
+{
+  "width": 1080,
+  "height": 1920,
+  "themeConfig": {
+    "primaryColor": "#22C55E",
+    "accentColor": "#4ADE80",
+    "backgroundColor": "#08130C",
+    "surfaceColor": "#0F2417",
+    "textColor": "#ECFDF5",
+    "mutedTextColor": "#86EFAC",
+    "headingFont": "Space Grotesk",
+    "bodyFont": "Space Grotesk",
+    "monoFont": "Fira Code",
+    "chartColors": ["#22C55E", "#4ADE80", "#FACC15", "#86EFAC"],
+    "springConfig": { "damping": 12, "stiffness": 80, "mass": 1 },
+    "transitionDuration": 0.3,
+    "captionHighlightColor": "#4ADE80",
+    "captionBackgroundColor": "rgba(8,19,12,0.75)"
+  },
+  "cuts": [
+    {
+      "id": "hook",
+      "source": "",
+      "type": "hero_title",
+      "in_seconds": 0,
+      "out_seconds": 3.5,
+      "text": "Skip one coffee a day…",
+      "heroSubtitle": "…and retire a MILLIONAIRE?",
+      "subtitle": "…and retire a MILLIONAIRE?",
+      "accentColor": "#4ADE80",
+      "backgroundColor": "#08130C"
+    },
+    {
+      "id": "setup",
+      "source": "",
+      "type": "stat_card",
+      "in_seconds": 3.5,
+      "out_seconds": 8.0,
+      "stat": "$6 / day",
+      "subtitle": "= $182 a month. Invested, not spent.",
+      "accentColor": "#4ADE80",
+      "backgroundColor": "#08130C"
+    },
+    {
+      "id": "engine",
+      "source": "",
+      "type": "text_card",
+      "in_seconds": 8.0,
+      "out_seconds": 12.5,
+      "text": "The secret isn't the $6.\nIt's compound interest.",
+      "color": "#ECFDF5",
+      "accentColor": "#4ADE80",
+      "backgroundColor": "#08130C"
+    },
+    {
+      "id": "chart",
+      "source": "",
+      "type": "line_chart",
+      "in_seconds": 12.5,
+      "out_seconds": 19.5,
+      "title": "$182/mo growing at a 10% avg return",
+      "chartSeries": [
+        {
+          "label": "Balance",
+          "color": "#22C55E",
+          "data": [
+            { "x": 0, "y": 0 },
+            { "x": 5, "y": 14125 },
+            { "x": 10, "y": 37400 },
+            { "x": 15, "y": 75660 },
+            { "x": 20, "y": 138600 },
+            { "x": 25, "y": 242200 },
+            { "x": 30, "y": 412800 },
+            { "x": 35, "y": 693100 },
+            { "x": 40, "y": 1154000 }
+          ]
+        }
+      ],
+      "chartColors": ["#22C55E"],
+      "chartAnimation": "draw",
+      "showMarkers": true,
+      "showGrid": true,
+      "xLabel": "Years invested",
+      "yLabel": "Balance ($)",
+      "backgroundColor": "#08130C"
+    },
+    {
+      "id": "payoff",
+      "source": "",
+      "type": "stat_card",
+      "in_seconds": 19.5,
+      "out_seconds": 24.0,
+      "stat": "$1,150,000+",
+      "subtitle": "from $6/day over 40 years",
+      "accentColor": "#FACC15",
+      "backgroundColor": "#08130C"
+    },
+    {
+      "id": "compare",
+      "source": "",
+      "type": "comparison",
+      "in_seconds": 24.0,
+      "out_seconds": 28.5,
+      "title": "Same $6. Two futures.",
+      "leftLabel": "Spend it",
+      "leftValue": "$0",
+      "rightLabel": "Invest it",
+      "rightValue": "$1M+",
+      "backgroundColor": "#08130C"
+    },
+    {
+      "id": "cta",
+      "source": "",
+      "type": "hero_title",
+      "in_seconds": 28.5,
+      "out_seconds": 33.0,
+      "text": "Start today.",
+      "heroSubtitle": "Your future self says thanks.",
+      "subtitle": "Your future self says thanks.",
+      "accentColor": "#4ADE80",
+      "backgroundColor": "#08130C"
+    }
+  ],
+  "overlays": [
+    {
+      "type": "section_title",
+      "in_seconds": 8.3,
+      "out_seconds": 12.2,
+      "text": "The Engine",
+      "subtitle": "Money that earns money",
+      "accentColor": "#4ADE80",
+      "position": "top-left"
+    },
+    {
+      "type": "stat_reveal",
+      "in_seconds": 13.0,
+      "out_seconds": 19.0,
+      "text": "10% / yr",
+      "subtitle": "S&P 500 long-run avg (illustrative)",
+      "accentColor": "#FACC15",
+      "position": "bottom-right"
+    }
+  ],
+  "captions": [],
+  "audio": {}
+}
