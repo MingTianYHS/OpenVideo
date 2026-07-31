@@ -91,6 +91,14 @@ class VideoCompose(BaseTool):
             },
             "input_path": {"type": "string"},
             "output_path": {"type": "string"},
+            "public_dir": {
+                "type": "string",
+                "description": (
+                    "Project-local Remotion public directory. For atelier renders, "
+                    "this is used when edit_decisions.bespoke.public_dir is absent, "
+                    "so render wiring does not require mutating approved edit decisions."
+                ),
+            },
             "edit_decisions": {
                 "type": "object",
                 "description": "Full edit_decisions artifact (required for compose/render)",
@@ -814,7 +822,10 @@ class VideoCompose(BaseTool):
             # Equals form is required for cross-platform path parsing (see _remotion_render).
             cmd.append(f"--props={pp}")
 
-        public_dir = bespoke.get("public_dir")
+        # The public directory is render wiring, not a creative Edit decision.
+        # Accept it as an explicit tool input so an approved edit artifact does
+        # not need to be mutated merely to expose project-local static assets.
+        public_dir = bespoke.get("public_dir") or inputs.get("public_dir")
         if public_dir:
             pd = Path(public_dir).resolve()
             if pd.exists():

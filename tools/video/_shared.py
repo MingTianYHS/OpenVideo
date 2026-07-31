@@ -416,42 +416,19 @@ def poll_heygen(execution_id: str, api_key: str, timeout: int = 600) -> str:
 
 
 def upload_image_fal(image_path: str) -> str:
-    """Upload a local image to fal.ai storage and return a public URL."""
-    import requests
-
-    api_key = os.environ.get("FAL_KEY") or os.environ.get("FAL_AI_API_KEY")
-    if not api_key:
-        raise RuntimeError("FAL_KEY or FAL_AI_API_KEY required for image upload")
+    """Upload a local image with the official fal client and return its URL."""
+    import fal_client
 
     path = Path(image_path)
     if not path.exists():
         raise FileNotFoundError(f"Image not found: {image_path}")
+    if not path.is_file():
+        raise ValueError(f"Image path is not a file: {image_path}")
 
-    suffix = path.suffix.lower()
-    content_type = {"png": "image/png", "jpg": "image/jpeg", "jpeg": "image/jpeg", "webp": "image/webp"}.get(
-        suffix.lstrip("."), "image/png"
-    )
-
-    # Initiate upload
-    init_resp = requests.post(
-        "https://rest.alpha.fal.ai/storage/upload/initiate",
-        headers={"Authorization": f"Key {api_key}", "Content-Type": "application/json"},
-        json={"content_type": content_type, "file_name": path.name},
-        timeout=30,
-    )
-    init_resp.raise_for_status()
-    data = init_resp.json()
-
-    # Upload file content
-    put_resp = requests.put(
-        data["upload_url"],
-        headers={"Content-Type": content_type},
-        data=path.read_bytes(),
-        timeout=60,
-    )
-    put_resp.raise_for_status()
-
-    return data["file_url"]
+    url = fal_client.upload_file(path)
+    if not isinstance(url, str) or not url.strip():
+        raise RuntimeError(f"fal_client.upload_file returned no URL for {image_path}")
+    return url.strip()
 
 
 def upload_image_heygen(image_path: str, api_key: str) -> str:

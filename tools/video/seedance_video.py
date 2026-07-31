@@ -159,6 +159,30 @@ class SeedanceVideo(BaseTool):
         "Watch generated clip for motion coherence, audio sync, and visual quality"
     ]
 
+    REFERENCE_OUTBOUND_FIELDS = (
+        "prompt",
+        "duration",
+        "aspect_ratio",
+        "resolution",
+        "generate_audio",
+        "seed",
+        "image_urls",
+        "video_urls",
+        "audio_urls",
+    )
+    TRACE_HEADER_NAMES = frozenset(
+        {
+            "cf-ray",
+            "date",
+            "server-timing",
+            "traceparent",
+            "x-amzn-trace-id",
+            "x-cloud-trace-context",
+            "x-fal-request-id",
+            "x-request-id",
+        }
+    )
+
     def _get_api_key(self) -> str | None:
         return os.environ.get("FAL_KEY") or os.environ.get("FAL_AI_API_KEY")
 
@@ -178,6 +202,67 @@ class SeedanceVideo(BaseTool):
         variant = inputs.get("model_variant", "standard")
         return 60.0 if variant == "fast" else 120.0
 
+    @classmethod
+    def _trace_headers(cls, headers: Any) -> dict[str, str]:
+        return {
+            str(key): str(value)
+            for key, value in dict(headers or {}).items()
+            if str(key).lower() in cls.TRACE_HEADER_NAMES
+            or "request-id" in str(key).lower()
+            or "trace" in str(key).lower()
+        }
+
+    @classmethod
+    def _http_failure_result(
+        cls,
+        *,
+        exc: Exception,
+        phase: str,
+        model_path: str,
+        request_id: str | None,
+        terminal_queue_status: str,
+        started: float,
+        outbound_payload: dict[str, Any],
+    ) -> ToolResult:
+        response = getattr(exc, "response", None)
+        status_code = getattr(exc, "status_code", None)
+        if status_code is None and response is not None:
+            status_code = getattr(response, "status_code", None)
+        response_body = ""
+        if response is not None:
+            try:
+                response_body = response.text
+            except Exception:
+                response_body = repr(getattr(response, "content", b""))
+        response_headers = cls._trace_headers(
+            getattr(exc, "response_headers", None)
+            or getattr(response, "headers", None)
+        )
+        elapsed = round(time.monotonic() - started, 2)
+        diagnostics = {
+            "provider": "seedance",
+            "model": model_path,
+            "phase": phase,
+            "http_status": status_code,
+            "response_body": response_body,
+            "response_headers": response_headers,
+            "fal_request_id": request_id,
+            "terminal_queue_status": terminal_queue_status,
+            "elapsed_processing_seconds": elapsed,
+            "outbound_payload": outbound_payload,
+        }
+        return ToolResult(
+            success=False,
+            data=diagnostics,
+            error=(
+                f"Seedance 2.0 {phase} failed"
+                f" with HTTP {status_code}: {response_body}"
+            ),
+            cost_usd=0.0,
+            duration_seconds=elapsed,
+            model=model_path,
+        )
+
     def execute(self, inputs: dict[str, Any]) -> ToolResult:
         api_key = self._get_api_key()
         if not api_key:
@@ -186,9 +271,10 @@ class SeedanceVideo(BaseTool):
                 error="FAL_KEY not set. " + self.install_instructions,
             )
 
+        import fal_client
         import requests
 
-        start = time.time()
+        started = time.monotonic()
         operation = inputs.get("operation", "text_to_video")
         variant = inputs.get("model_variant", "standard")
         operation_path = operation.replace("_", "-")
@@ -222,9 +308,15 @@ class SeedanceVideo(BaseTool):
 
         if operation == "reference_to_video":
             ref_image_urls = list(inputs.get("reference_image_urls") or [])
-            for local_path in inputs.get("reference_image_paths") or []:
-                from tools.video._shared import upload_image_fal
-                ref_image_urls.append(upload_image_fal(local_path))
+            try:
+                for local_path in inputs.get("reference_image_paths") or []:
+                    from tools.video._shared import upload_image_fal
+                    ref_image_urls.append(upload_image_fal(local_path))
+            except Exception as exc:
+                return ToolResult(
+                    success=False,
+                    error=f"Seedance 2.0 reference preparation failed: {exc}",
+                )
             # Seedance 2.0 reference-to-video ceilings: 9 images + 3 video + 3 audio.
             if len(ref_image_urls) > 9:
                 return ToolResult(
@@ -244,46 +336,112 @@ class SeedanceVideo(BaseTool):
                     error=f"Seedance 2.0 reference_to_video accepts at most 3 reference audio clips; got {len(ref_audio_urls)}",
                 )
             if ref_image_urls:
-                payload["reference_image_urls"] = ref_image_urls
+                payload["image_urls"] = ref_image_urls
             if ref_video_urls:
-                payload["reference_video_urls"] = ref_video_urls
+                payload["video_urls"] = ref_video_urls
             if ref_audio_urls:
-                payload["reference_audio_urls"] = ref_audio_urls
+                payload["audio_urls"] = ref_audio_urls
 
-        headers = {
-            "Authorization": f"Key {api_key}",
-            "Content-Type": "application/json",
-        }
+            # Provider boundary: selector/repository inputs and deprecated
+            # aliases must never cross into the Seedance request body.
+            payload = {
+                field: payload[field]
+                for field in self.REFERENCE_OUTBOUND_FIELDS
+                if field in payload
+            }
+
+        handle = None
+        request_id = None
+        terminal_queue_status = "NOT_SUBMITTED"
+        try:
+            handle = fal_client.submit(model_path, payload)
+            request_id = getattr(handle, "request_id", None)
+            terminal_queue_status = "SUBMITTED"
+        except fal_client.FalClientHTTPError as exc:
+            return self._http_failure_result(
+                exc=exc,
+                phase="submission",
+                model_path=model_path,
+                request_id=request_id,
+                terminal_queue_status=terminal_queue_status,
+                started=started,
+                outbound_payload=payload,
+            )
+        except Exception as exc:
+            elapsed = round(time.monotonic() - started, 2)
+            return ToolResult(
+                success=False,
+                data={
+                    "provider": "seedance",
+                    "model": model_path,
+                    "phase": "submission",
+                    "fal_request_id": request_id,
+                    "terminal_queue_status": terminal_queue_status,
+                    "elapsed_processing_seconds": elapsed,
+                    "outbound_payload": payload,
+                },
+                error=f"Seedance 2.0 submission failed: {exc}",
+                cost_usd=0.0,
+                duration_seconds=elapsed,
+                model=model_path,
+            )
 
         try:
-            submit_resp = requests.post(
-                f"https://queue.fal.run/{model_path}",
-                headers=headers,
-                json=payload,
-                timeout=30,
-            )
-            submit_resp.raise_for_status()
-            queue_data = submit_resp.json()
-            status_url = queue_data["status_url"]
-            response_url = queue_data["response_url"]
-
             while True:
-                time.sleep(5)
-                status_resp = requests.get(status_url, headers=headers, timeout=15)
-                status_resp.raise_for_status()
-                status = status_resp.json().get("status", "UNKNOWN")
-                if status == "COMPLETED":
+                status = handle.status(with_logs=True)
+                terminal_queue_status = type(status).__name__.upper()
+                if isinstance(status, fal_client.Completed):
+                    status_error = getattr(status, "error", None)
+                    if status_error:
+                        error_type = getattr(status, "error_type", None)
+                        elapsed = round(time.monotonic() - started, 2)
+                        return ToolResult(
+                            success=False,
+                            data={
+                                "provider": "seedance",
+                                "model": model_path,
+                                "phase": "polling",
+                                "http_status": None,
+                                "response_body": status_error,
+                                "response_headers": {},
+                                "fal_request_id": request_id,
+                                "terminal_queue_status": "COMPLETED_WITH_ERROR",
+                                "elapsed_processing_seconds": elapsed,
+                                "outbound_payload": payload,
+                                "error_type": error_type,
+                            },
+                            error=f"Seedance 2.0 completed with error: {status_error}",
+                            cost_usd=0.0,
+                            duration_seconds=elapsed,
+                            model=model_path,
+                        )
                     break
-                if status in ("FAILED", "CANCELLED"):
-                    return ToolResult(
-                        success=False,
-                        error=f"Seedance 2.0 video generation {status.lower()}",
-                    )
+                time.sleep(5)
+        except fal_client.FalClientHTTPError as exc:
+            return self._http_failure_result(
+                exc=exc,
+                phase="polling",
+                model_path=model_path,
+                request_id=request_id,
+                terminal_queue_status=terminal_queue_status,
+                started=started,
+                outbound_payload=payload,
+            )
 
-            result_resp = requests.get(response_url, headers=headers, timeout=30)
-            result_resp.raise_for_status()
-            data = result_resp.json()
+        try:
+            data = handle.get()
+        except fal_client.FalClientHTTPError as exc:
+            return self._http_failure_result(
+                exc=exc,
+                phase="result",
+                model_path=model_path,
+                request_id=request_id,
+                terminal_queue_status=terminal_queue_status,
+                started=started,
+                outbound_payload=payload,
+            )
 
+        try:
             video_url = data["video"]["url"]
             video_response = requests.get(video_url, timeout=120)
             video_response.raise_for_status()
@@ -292,10 +450,23 @@ class SeedanceVideo(BaseTool):
             output_path.parent.mkdir(parents=True, exist_ok=True)
             output_path.write_bytes(video_response.content)
 
-        except Exception as e:
+        except Exception as exc:
+            elapsed = round(time.monotonic() - started, 2)
             return ToolResult(
                 success=False,
-                error=f"Seedance 2.0 video generation failed: {e}",
+                data={
+                    "provider": "seedance",
+                    "model": model_path,
+                    "phase": "download",
+                    "fal_request_id": request_id,
+                    "terminal_queue_status": terminal_queue_status,
+                    "elapsed_processing_seconds": elapsed,
+                    "outbound_payload": payload,
+                },
+                error=f"Seedance 2.0 result download failed: {exc}",
+                cost_usd=0.0,
+                duration_seconds=elapsed,
+                model=model_path,
             )
 
         from tools.video._shared import probe_output
@@ -320,6 +491,6 @@ class SeedanceVideo(BaseTool):
             },
             artifacts=[str(output_path)],
             cost_usd=self.estimate_cost(inputs),
-            duration_seconds=round(time.time() - start, 2),
+            duration_seconds=round(time.monotonic() - started, 2),
             model=model_path,
         )
