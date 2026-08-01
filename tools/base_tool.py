@@ -384,10 +384,32 @@ class BaseTool(ABC):
     # ---- Idempotency ----
 
     def idempotency_key(self, inputs: dict[str, Any]) -> str:
-        """Compute a cache key from idempotency fields."""
-        key_data = {k: inputs.get(k) for k in self.idempotency_key_fields}
-        raw = json.dumps(key_data, sort_keys=True)
+        """Compute a cache key from idempotency fields.
+
+        Schema defaults are applied first: omitting an optional field and
+        passing its declared default describe the *same request*, so they must
+        hash the same. Without this, `{"prompt": "tick"}` and
+        `{"prompt": "tick", "prompt_influence": 0.3}` produce different keys
+        for an identical provider payload — defeating the cache and letting a
+        paid generation run twice.
+        """
+        key_data = {}
+        for field in self.idempotency_key_fields:
+            value = inputs.get(field)
+            # An explicit None means "unset" the same way omission does.
+            key_data[field] = (
+                self._schema_default(field) if value is None else value
+            )
+        raw = json.dumps(key_data, sort_keys=True, default=str)
         return hashlib.sha256(raw.encode()).hexdigest()[:16]
+
+    def _schema_default(self, field: str) -> Any:
+        """The input_schema default for `field`, or None when it has none."""
+        properties = (self.input_schema or {}).get("properties") or {}
+        spec = properties.get(field)
+        if isinstance(spec, dict):
+            return spec.get("default")
+        return None
 
     # ---- Execution ----
 

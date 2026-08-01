@@ -273,7 +273,7 @@ No subscription — pure pay-as-you-go, no minimum spend.
 
 > **Premium voice quality.** Best TTS for narration-heavy videos. Also generates music and sound effects.
 
-**Tools unlocked:** `elevenlabs_tts`, `music_gen`
+**Tools unlocked:** `elevenlabs_tts`, `music_gen`, `sfx_gen`
 **Env var:** `ELEVENLABS_API_KEY`
 
 #### Setup
@@ -294,6 +294,23 @@ No subscription — pure pay-as-you-go, no minimum spend.
 | Scale | $330/mo | 2,000,000 | Priority support |
 
 **Free tier:** 10,000 characters/month (roughly 2-3 minutes of narration). API access included. Music generation and sound effects also available on free tier with limited credits.
+
+#### Sound effects (`sfx_gen`)
+
+Sound-effect generation is billed **per minute of generated audio**, not per effect, and each plan bundles a monthly generation allowance:
+
+| Plan | Included SFX generations |
+|------|--------------------------|
+| Free / pay-as-you-go | 8 |
+| Starter | 150 |
+| Creator | 605 |
+| Pro | 3,000 |
+| Scale | 9,000 |
+| Business | 30,000 |
+
+Pay-as-you-go list rate: **$0.12/minute** — so a 0.6s UI tick is ~$0.001 and a 20s ambient bed is ~$0.04. `sfx_gen.estimate_cost()` uses this list rate as an upper bound; check [elevenlabs.io/pricing/api](https://elevenlabs.io/pricing/api) for current numbers before quoting them to a user.
+
+A typical `product-motion` run generates 4-8 short cues (well under $0.05 total).
 
 ---
 
@@ -927,7 +944,7 @@ These tools require only FFmpeg or Python packages — no GPU, no API key.
 | **Pixabay** | `PIXABAY_API_KEY` | `pixabay_image`, `pixabay_video` | Free |
 | **Piper** | — (install only) | `piper_tts` | Free |
 | **Google** | `GOOGLE_API_KEY` (or `GEMINI_API_KEY`) | `google_tts`, `google_imagen`, `google_music`, `gemini_omni_video`, `veo_video` | Free tier (TTS) + paid |
-| **ElevenLabs** | `ELEVENLABS_API_KEY` | `elevenlabs_tts`, `music_gen` | Free tier + paid |
+| **ElevenLabs** | `ELEVENLABS_API_KEY` | `elevenlabs_tts`, `music_gen`, `sfx_gen` | Free tier + paid |
 | **fal.ai** | `FAL_KEY` | `flux_image`, `recraft_image`, `kling_video`, `veo_video`, `minimax_video` | Pay-as-you-go |
 | **Kling Official** | `KLING_API_KEY` | `kling_official_video`, `kling_official_image`, `kling_tts`, `kling_avatar`, `kling_lip_sync` | Pay-as-you-go |
 | **OpenAI** | `OPENAI_API_KEY` | `openai_tts`, `openai_image` | Paid only |
@@ -952,6 +969,7 @@ How many providers cover each capability:
 | **Video Generation** | Grok, Kling Official, Kling via fal.ai, Runway, Veo, Gemini Omni, Higgsfield, MiniMax, HeyGen | WAN, Hunyuan, CogVideo, LTX | Pexels, Pixabay (stock) |
 | **Text-to-Speech** | ElevenLabs, Google TTS, Kling Official, OpenAI | Piper | Piper, Google free tier, ElevenLabs free tier |
 | **Music Generation** | ElevenLabs, Suno, Google Lyria | — | ElevenLabs free tier |
+| **Sound Effects** | ElevenLabs | — | ElevenLabs free tier (8 generations) |
 | **Post-Production** | — | FFmpeg (compose, stitch, trim, mix, enhance, grade) | All free |
 | **Analysis** | — | WhisperX, Scene Detect, Frame Sampler, CLIP/BLIP-2 | All free |
 | **Enhancement** | — | Upscale, BG Remove, Face Enhance, Face Restore | All free |

@@ -18,17 +18,21 @@ from schemas.artifacts import ARTIFACT_NAMES, validate_artifact
 
 # All known stages across all pipelines (used only for artifact name lookup).
 ALL_KNOWN_STAGES = frozenset([
-    "research", "proposal", "idea", "script", "scene_plan",
+    "research", "repo_analysis", "proposal", "idea", "script", "scene_plan",
     "assets", "edit", "compose", "publish",
 ])
 
 # Backward-compatible alias — existing code / tests that import STAGES still work.
 # New code should use get_pipeline_stages(pipeline_type) instead.
+# NOTE: repo_analysis (product-motion) is intentionally NOT in this legacy
+# fallback order — manifest-driven pipelines get their order from
+# get_pipeline_stages(pipeline_type); the fallback keeps the canonical 9.
 STAGES = ["research", "proposal", "idea", "script", "scene_plan",
           "assets", "edit", "compose", "publish"]
 
 CANONICAL_STAGE_ARTIFACTS = {
     "research": "research_brief",
+    "repo_analysis": "design_system",
     "proposal": "proposal_packet",
     "idea": "brief",
     "script": "script",
@@ -45,6 +49,11 @@ SUPPLEMENTARY_ARTIFACTS = {
     "source_media_review",  # Required before first planning stage when user media exists
     "final_review",         # Required by compose stage before presenting to user
     "video_analysis_brief", # Reference-video grounding artifact carried alongside stages
+    # Screens/components catalog authored alongside design_system in
+    # repo_analysis. Supplementary only in the sense that it is not the stage's
+    # *canonical* artifact — product-motion declares it in the stage's
+    # `required_outputs`, so a repo_analysis checkpoint cannot close without it.
+    "ui_inventory",
 }
 
 
@@ -101,10 +110,29 @@ def _load_checkpoint_schema() -> dict[str, Any]:
         return json.load(f)
 
 
+def _stage_required_outputs(pipeline_type: Optional[str], stage: str) -> list[str]:
+    """Manifest-declared artifacts a stage must produce, beyond the canonical one.
+
+    A manifest that cannot be loaded yields [] — the canonical-artifact check
+    still applies, and _stage_requires_approval already fails closed on an
+    unknown pipeline_type, so a typo cannot reach here and quietly disable the
+    requirement.
+    """
+    if not pipeline_type or pipeline_type == "unknown":
+        return []
+    from lib.pipeline_loader import get_stage_required_outputs, load_pipeline_readonly
+    try:
+        manifest = load_pipeline_readonly(pipeline_type)
+    except Exception:
+        return []
+    return get_stage_required_outputs(manifest, stage)
+
+
 def _validate_artifacts_for_stage(
     stage: str,
     status: str,
     artifacts: dict[str, Any],
+    pipeline_type: Optional[str] = None,
 ) -> None:
     # Valid stages come from the pipeline manifest (get_pipeline_stages), which
     # can declare stages beyond the 9 canonical ones (e.g. character-animation's
@@ -121,6 +149,25 @@ def _validate_artifacts_for_stage(
             f"Stage {stage!r} with status {status!r} must include "
             f"canonical artifact {required_artifact!r}"
         )
+
+    # Manifest-declared required_outputs. Some stages produce more than one
+    # load-bearing artifact (product-motion's repo_analysis authors both
+    # design_system and ui_inventory, and every downstream truthfulness check
+    # reads the second one). Declaring only a canonical artifact would let such
+    # a stage close half-done.
+    if status in {"completed", "awaiting_human"}:
+        missing = [
+            name
+            for name in _stage_required_outputs(pipeline_type, stage)
+            if name not in artifacts
+        ]
+        if missing:
+            raise CheckpointValidationError(
+                f"Stage {stage!r} with status {status!r} is missing "
+                f"required output(s) {missing!r} declared by the "
+                f"{pipeline_type!r} manifest. Produce them before closing the "
+                f"stage — downstream stages read them."
+            )
 
     for artifact_name, artifact_data in artifacts.items():
         if artifact_name not in ARTIFACT_NAMES:
@@ -163,7 +210,7 @@ def validate_checkpoint(checkpoint: dict[str, Any]) -> None:
     if not isinstance(artifacts, dict):
         raise CheckpointValidationError("Checkpoint artifacts must be a dictionary")
 
-    _validate_artifacts_for_stage(stage, status, artifacts)
+    _validate_artifacts_for_stage(stage, status, artifacts, pipeline_type)
 
     try:
         jsonschema.validate(instance=checkpoint, schema=_load_checkpoint_schema())

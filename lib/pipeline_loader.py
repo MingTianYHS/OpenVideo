@@ -182,6 +182,23 @@ def get_stage_human_approval_default(manifest: dict, stage_name: str) -> Optiona
     return None
 
 
+def get_stage_required_outputs(manifest: dict, stage_name: str) -> list[str]:
+    """Artifacts a completed/awaiting_human checkpoint for this stage must carry.
+
+    Declared per-stage as `required_outputs`. The canonical artifact
+    (CANONICAL_STAGE_ARTIFACTS) is always required on top of this — the field
+    exists for stages whose contract needs *more* than one artifact, e.g.
+    product-motion's repo_analysis, where downstream fidelity checks read
+    ui_inventory as well as design_system.
+
+    Returns [] for stages that declare nothing (the common case).
+    """
+    for stage in manifest["stages"]:
+        if stage["name"] == stage_name:
+            return list(stage.get("required_outputs", []))
+    return []
+
+
 def get_stage_review_focus(manifest: dict, stage_name: str) -> list[str]:
     """Get the review focus items for a stage."""
     for stage in manifest["stages"]:

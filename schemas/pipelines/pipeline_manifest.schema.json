@@ -61,6 +61,11 @@
             "items": { "type": "string" },
             "description": "Artifact names this stage produces"
           },
+          "required_outputs": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Subset of `produces` that a completed or awaiting_human checkpoint for this stage MUST contain. Use when downstream stages depend on more than the stage's canonical artifact; lib/checkpoint.py enforces it at write time."
+          },
           "preferred_tools": {
             "type": "array",
             "items": { "type": "string" },
