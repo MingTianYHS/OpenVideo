@@ -221,15 +221,18 @@ Let the user select, combine, modify, or redirect entirely.
 
 Cinematic videos live and die by their audio. Surface the music situation before the user approves.
 
-Check availability in this order:
-1. **User music library (`music_library/`)** — list available tracks
-2. **Music generation APIs** — report status, cost, and quality honestly
-3. **Bring-your-own path** — user can drop a track in `music_library/`
+Check availability in this order. Music spans **three** capabilities — checking
+only `music_generation` hides the free stock sources:
+1. **User music library** (`registry.get_by_capability("music_library")`) — list available tracks
+2. **Stock music search** (`registry.get_by_capability("music_search")`) — `pixabay_music` needs **no API key**; offer it before anything paid
+3. **Music generation APIs** (`registry.get_by_capability("music_generation")`) — report status, cost, and quality honestly
+4. **Bring-your-own path** — user can drop a track in `music_library/`
 
 Present explicit options:
 ```
 MUSIC PLAN
 ├── Your music library: [N tracks / empty]
+├── Free stock search: [pixabay_music / freesound_music] — [AVAILABLE/UNAVAILABLE]
 ├── AI generation: [provider] — [AVAILABLE/UNAVAILABLE] [cost]
 └── Bring your own: Drop a track in music_library/ before asset stage
 

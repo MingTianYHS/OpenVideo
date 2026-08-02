@@ -369,9 +369,12 @@ Music is a critical part of the video's feel. **Surface the music situation to t
 
 **Check music availability in this order:**
 
-1. **User music library (`music_library/`):** Check if this folder exists and contains tracks. If so, list available tracks with durations and let the user pick one.
-2. **Music generation APIs:** Check which music tools are available via the registry (`registry.get_by_capability("music_generation")`). Report their status honestly.
-3. **Stock music sources:** Note if stock music is available via any provider.
+Music spans **three** capabilities. Check all of them — querying only
+`music_generation` hides the free stock sources.
+
+1. **User music library:** Check `registry.get_by_capability("music_library")`, or the folder directly. If it has tracks, list them with durations and let the user pick one.
+2. **Stock music search:** Check `registry.get_by_capability("music_search")`. `pixabay_music` needs **no API key** and is royalty-free for commercial use. Offer it before anything paid.
+3. **Music generation APIs:** Check `registry.get_by_capability("music_generation")`. Report their status honestly, and name the cost.
 
 **Present to the user:**
 
@@ -381,21 +384,24 @@ MUSIC PLAN
 │   ├── cosmic_interstellar_space.mp3 (3:13) — ambient, cosmic
 │   ├── cinematic_epic.mp3 (2:45) — dramatic, building
 │   └── lofi_beat.mp3 (4:00) — chill, electronic
+├── Free stock search: pixabay_music — AVAILABLE (no API key needed)
 ├── AI generation: music_gen (ElevenLabs) — UNAVAILABLE (plan limit)
 └── Recommendation: Use "cosmic_interstellar_space.mp3" from your library
     OR provide a different track before asset generation
 
 Would you like to:
   (a) Use a track from your library (which one?)
-  (b) Provide a different track (drop it in music_library/)
-  (c) Generate one via API (if available)
-  (d) Proceed without music
+  (b) Search free stock music
+  (c) Provide a different track (drop it in music_library/)
+  (d) Generate one via API (if available)
+  (e) Proceed without music
 ```
 
-**If no music source is available:** Tell the user explicitly. Do NOT let this surface as a surprise at the asset stage. Offer the `music_library/` path so they can add a track before production starts.
+**If no music source is available:** Tell the user explicitly. Do NOT let this surface as a surprise at the asset stage. Offer the `music_library/` path so they can add a track before production starts. Note that an empty `music_library/` is **not** the same as no music available — stock search is still there and costs nothing.
 
 **Rules:**
 - Always check `music_library/` first — user-provided music is free and intentional
+- Free sources (library, then stock search) come before anything that bills
 - Always report music API status (available, unavailable, quota remaining if checkable)
 - Record the music decision in `proposal_packet.production_plan.music_source`
 - If the user picks a library track, record its path for the asset director

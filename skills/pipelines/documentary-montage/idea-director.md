@@ -90,11 +90,15 @@ itself. If the user has not mentioned music, ASSUME THEY WANT IT and pick:
 
 - user-provided track (put path in `music_plan.source_path`),
 - music library pick (list what's in `music_library/`),
+- free stock search (`registry.get_by_capability("music_search")` — `pixabay_music` needs no API key),
 - generated (name the tool and prompt seed with register),
 - explicit opt-out (`source: "none"` + `opt_out_reason`).
 
 **Warn the user if no music source is available.** Do not silently
-defer this — it becomes an expensive surprise at the asset stage.
+defer this — it becomes an expensive surprise at the asset stage. Check all
+three music capabilities before concluding nothing is available: `music_library`,
+`music_search`, and `music_generation`. An empty `music_library/` on its own is
+not "no music" — free stock search is usually still there.
 
 ### 5. Note End-Tag Intent (MANDATORY)
 

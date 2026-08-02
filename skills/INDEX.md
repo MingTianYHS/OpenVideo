@@ -60,7 +60,9 @@ Key capability families to look for in the output:
 | `analysis` | — | Mixed providers |
 | `character_animation` | — | Local character specs, SVG rigs, pose libraries, action timelines, previews, and QA |
 | `graphics` | — | Local rendering tools |
-| `music_generation` | — | Single-provider |
+| `music_generation` | — | `music_gen` (ElevenLabs), `google_music` (Lyria) |
+| `music_search` | — | `pixabay_music` (no API key), `freesound_music` |
+| `music_library` | — | Local user files in `music_library/` |
 | `subtitle` | — | Pure Python |
 | `avatar` | — | Local GPU models |
 | `video_post` | — | FFmpeg-based local tools |

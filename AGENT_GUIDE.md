@@ -526,17 +526,29 @@ If a user prefers a specific vendor and that tool is available, surface it direc
 
 Music is a critical part of any video. **Surface the music situation to the user at proposal/idea time** — do not silently defer it to the asset stage where a failure becomes expensive.
 
-Check music availability in this order and present the options:
+Music tools span **three** capability names. Checking only one is the most common
+mistake here, and it makes music look far more constrained than it is:
 
-1. **User music library (`music_library/`):** Check if this folder exists and contains tracks. If so, list available tracks with durations and let the user pick one.
-2. **Music generation APIs:** Check which music tools are available via the registry (`registry.get_by_capability("music_generation")`). Report their status honestly — include quota status if known.
-3. **Royalty-free sources:** Note if the user can provide their own track (e.g., from YouTube Audio Library, Jamendo, or other free sources). Offer the `music_library/` drop path.
+| Capability | Tools | Cost |
+|---|---|---|
+| `music_library` | `music_library` | free, user's own files |
+| `music_search` | `pixabay_music`, `freesound_music` | free (`pixabay_music` needs **no API key at all**) |
+| `music_generation` | `music_gen` (ElevenLabs), `google_music` (Lyria) | paid API key |
+
+Check all three and present the options:
+
+1. **User music library (`music_library/`):** Check `registry.get_by_capability("music_library")`, or the folder directly. If it has tracks, list them with durations and let the user pick one.
+2. **Stock music search:** Check `registry.get_by_capability("music_search")`. `pixabay_music` requires no key and is royalty-free for commercial use, so it is usually available even on a bare install. Offer it before anything that costs money.
+3. **Music generation APIs:** Check `registry.get_by_capability("music_generation")`. Report status honestly — include quota status if known, and name the cost.
 
 **Always present the user with explicit choices:**
 - Use a track from their library (which one?)
+- Search free stock music (`pixabay_music` / `freesound_music`)
 - Provide a different track (drop it in `music_library/`)
 - Generate one via API (if available — name the provider and cost)
 - Proceed without music
+
+**Prefer free sources first.** An empty `music_library/` is not "no music available" — stock search is still there, and it costs nothing.
 
 **If no music source is available:** Tell the user explicitly. Do NOT let this surface as a surprise at the asset stage.
 
