@@ -83,7 +83,7 @@ class TestAgnesVideo:
         assert frames <= 441
 
     def test_explicit_frames_are_normalized(self):
-        assert AgnesVideo._normalize_num_frames(5, 24, explicit=120) == 113
+        assert AgnesVideo._normalize_num_frames(5, 24, explicit=120) == 121
         assert AgnesVideo._normalize_num_frames(5, 24, explicit=999) == 441
 
     def test_text_to_video_payload(self):

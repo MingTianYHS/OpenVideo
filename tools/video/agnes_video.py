@@ -136,7 +136,9 @@ class AgnesVideo(BaseTool):
             requested = max(1, min(441, int(explicit)))
         else:
             requested = max(1, min(441, round(float(duration or 5) * frame_rate)))
-        return min(441, max(1, ((requested - 1) // 8) * 8 + 1))
+        # Agnes requires 8n+1 frames. Round upward so the generated clip is not
+        # shorter than requested, then clamp to the documented 441-frame limit.
+        return min(441, max(1, ((requested - 1 + 7) // 8) * 8 + 1))
 
     @staticmethod
     def _dimensions(inputs: dict[str, Any]) -> tuple[int, int]:
