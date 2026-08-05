@@ -49,16 +49,18 @@ def agnes_api_key_for_region(region: str) -> str:
     return os.environ.get(env_name) or os.environ.get("AGNES_API_KEY", "")
 
 
-def agnes_base_url_for_region(region: str) -> str:
+def agnes_base_url_for_region(region: str, *, use_legacy: bool = True) -> str:
     """Return the region-specific API host.
 
     Region-specific variables take precedence. AGNES_BASE_URL remains supported
-    for backward compatibility. Values should be host roots without a trailing
-    /v1 because provider paths already include /v1.
+    only for callers using the legacy implicit-global configuration. Explicit
+    region selection must not be redirected by a stale shared base URL.
     """
     env_name = "AGNES_CN_BASE_URL" if region == "cn" else "AGNES_GLOBAL_BASE_URL"
-    value = os.environ.get(env_name) or os.environ.get("AGNES_BASE_URL") or AGNES_BASE_URLS[region]
-    value = value.rstrip("/")
+    value = os.environ.get(env_name)
+    if not value and use_legacy:
+        value = os.environ.get("AGNES_BASE_URL")
+    value = (value or AGNES_BASE_URLS[region]).rstrip("/")
     if value.endswith("/v1"):
         value = value[:-3].rstrip("/")
     return value
@@ -80,9 +82,13 @@ class AgnesClient:
         region: str | None = None,
         max_retries: int = 2,
     ) -> None:
+        explicit_region = region is not None or bool(os.environ.get("AGNES_REGION"))
         self.region = normalize_agnes_region(region)
         self.api_key = api_key or agnes_api_key_for_region(self.region)
-        self.base_url = (base_url or agnes_base_url_for_region(self.region)).rstrip("/")
+        self.base_url = (
+            base_url
+            or agnes_base_url_for_region(self.region, use_legacy=not explicit_region)
+        ).rstrip("/")
         self.max_retries = max(0, max_retries)
         self.connect_timeout = float(os.environ.get("AGNES_CONNECT_TIMEOUT_SECONDS", "15"))
 
