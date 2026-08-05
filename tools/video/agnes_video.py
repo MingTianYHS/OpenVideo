@@ -7,18 +7,10 @@ import time
 from pathlib import Path
 from typing import Any
 
-from lib.providers.agnes import AgnesClient
+from lib.providers.agnes import AgnesClient, configured_agnes_regions
 from tools.base_tool import (
-    BaseTool,
-    Determinism,
-    ExecutionMode,
-    ResourceProfile,
-    RetryPolicy,
-    ToolResult,
-    ToolRuntime,
-    ToolStability,
-    ToolStatus,
-    ToolTier,
+    BaseTool, Determinism, ExecutionMode, ResourceProfile, RetryPolicy,
+    ToolResult, ToolRuntime, ToolStability, ToolStatus, ToolTier,
 )
 
 
@@ -40,7 +32,7 @@ _RESOLUTION_DIMENSIONS = {
 
 class AgnesVideo(BaseTool):
     name = "agnes_video"
-    version = "0.1.0"
+    version = "0.2.0"
     tier = ToolTier.GENERATE
     capability = "video_generation"
     provider = "agnes"
@@ -51,8 +43,8 @@ class AgnesVideo(BaseTool):
 
     dependencies = []
     install_instructions = (
-        "Set AGNES_API_KEY to an Agnes AI API key.\n"
-        "  Get one at https://platform.agnes-ai.com"
+        "Choose AGNES_REGION=cn or AGNES_REGION=global, then set the matching "
+        "AGNES_CN_API_KEY or AGNES_GLOBAL_API_KEY. AGNES_API_KEY remains supported."
     )
     agent_skills = ["ai-video-gen"]
 
@@ -65,6 +57,8 @@ class AgnesVideo(BaseTool):
         "negative_prompt": True,
         "seed": True,
         "frame_control": True,
+        "regions": ["cn", "global"],
+        "automatic_region_failover": False,
     }
     best_for = [
         "text-to-video and image-to-video generation",
@@ -79,26 +73,26 @@ class AgnesVideo(BaseTool):
         "required": ["prompt"],
         "properties": {
             "prompt": {"type": "string"},
+            "region": {
+                "type": "string", "enum": ["cn", "global"],
+                "description": "Agnes API region. Overrides AGNES_REGION for this call.",
+            },
             "operation": {
                 "type": "string",
                 "enum": ["text_to_video", "image_to_video", "reference_to_video", "keyframes"],
                 "default": "text_to_video",
             },
             "model": {
-                "type": "string",
-                "enum": ["agnes-video-v2.0"],
+                "type": "string", "enum": ["agnes-video-v2.0"],
                 "default": "agnes-video-v2.0",
             },
             "duration": {"type": ["integer", "string"], "default": 5},
             "aspect_ratio": {
-                "type": "string",
-                "enum": ["16:9", "9:16", "1:1", "4:3", "3:4"],
+                "type": "string", "enum": ["16:9", "9:16", "1:1", "4:3", "3:4"],
                 "default": "16:9",
             },
             "resolution": {
-                "type": "string",
-                "enum": ["480p", "720p", "1080p"],
-                "default": "720p",
+                "type": "string", "enum": ["480p", "720p", "1080p"], "default": "720p",
             },
             "width": {"type": "integer"},
             "height": {"type": "integer"},
@@ -120,24 +114,21 @@ class AgnesVideo(BaseTool):
         cpu_cores=1, ram_mb=512, vram_mb=0, disk_mb=1000, network_required=True
     )
     retry_policy = RetryPolicy(
-        max_retries=2,
-        retryable_errors=["rate_limit", "timeout", "server_error"],
+        max_retries=2, retryable_errors=["rate_limit", "timeout", "server_error"]
     )
-    idempotency_key_fields = ["prompt", "operation", "duration", "seed", "aspect_ratio"]
+    idempotency_key_fields = ["prompt", "operation", "duration", "seed", "aspect_ratio", "region"]
     side_effects = ["writes video file to output_path", "calls Agnes AI video API"]
     user_visible_verification = ["Watch generated clip and verify duration, motion, and prompt fidelity"]
 
     def get_status(self) -> ToolStatus:
-        return ToolStatus.AVAILABLE if os.environ.get("AGNES_API_KEY") else ToolStatus.UNAVAILABLE
+        return ToolStatus.AVAILABLE if configured_agnes_regions() else ToolStatus.UNAVAILABLE
 
     @staticmethod
     def _normalize_num_frames(duration: Any, frame_rate: float, explicit: Any = None) -> int:
-        if explicit is not None:
-            requested = max(1, min(441, int(explicit)))
-        else:
-            requested = max(1, min(441, round(float(duration or 5) * frame_rate)))
-        # Agnes requires 8n+1 frames. Round upward so the generated clip is not
-        # shorter than requested, then clamp to the documented 441-frame limit.
+        requested = (
+            max(1, min(441, int(explicit))) if explicit is not None
+            else max(1, min(441, round(float(duration or 5) * frame_rate)))
+        )
         return min(441, max(1, ((requested - 1 + 7) // 8) * 8 + 1))
 
     @staticmethod
@@ -151,9 +142,10 @@ class AgnesVideo(BaseTool):
 
     def estimate_cost(self, inputs: dict[str, Any]) -> float:
         frame_rate = float(inputs.get("frame_rate", 24))
-        frames = self._normalize_num_frames(inputs.get("duration", 5), frame_rate, inputs.get("num_frames"))
-        seconds = frames / frame_rate
-        return float(os.environ.get("AGNES_VIDEO_COST_PER_SECOND", "0")) * seconds
+        frames = self._normalize_num_frames(
+            inputs.get("duration", 5), frame_rate, inputs.get("num_frames")
+        )
+        return float(os.environ.get("AGNES_VIDEO_COST_PER_SECOND", "0")) * (frames / frame_rate)
 
     def _build_payload(self, inputs: dict[str, Any]) -> dict[str, Any]:
         frame_rate = float(inputs.get("frame_rate", 24))
@@ -163,7 +155,6 @@ class AgnesVideo(BaseTool):
             inputs.get("duration", 5), frame_rate, inputs.get("num_frames")
         )
         width, height = self._dimensions(inputs)
-
         payload: dict[str, Any] = {
             "model": "agnes-video-v2.0",
             "prompt": inputs["prompt"],
@@ -175,7 +166,6 @@ class AgnesVideo(BaseTool):
         for key in ("num_inference_steps", "seed", "negative_prompt"):
             if inputs.get(key) is not None:
                 payload[key] = inputs[key]
-
         operation = inputs.get("operation", "text_to_video")
         if operation == "image_to_video":
             image = inputs.get("image_url") or inputs.get("reference_image_url")
@@ -187,15 +177,12 @@ class AgnesVideo(BaseTool):
             if len(images) < 2:
                 raise ValueError("keyframe video requires at least two reference_image_urls")
             payload["extra_body"] = {"image": images, "mode": "keyframes"}
-
         return payload
 
     @staticmethod
     def _completed_url(data: dict[str, Any]) -> str | None:
         metadata = data.get("metadata") or {}
-        if isinstance(metadata, dict):
-            return metadata.get("url")
-        return None
+        return metadata.get("url") if isinstance(metadata, dict) else None
 
     def _poll_result(
         self,
@@ -208,7 +195,6 @@ class AgnesVideo(BaseTool):
     ) -> dict[str, Any]:
         deadline = time.time() + timeout_seconds
         last_data: dict[str, Any] = {}
-
         while time.time() < deadline:
             if video_id:
                 data = client.get_json(
@@ -220,32 +206,26 @@ class AgnesVideo(BaseTool):
                 data = client.get_json(f"/v1/videos/{task_id}", timeout=30)
             else:
                 raise RuntimeError("Agnes video response is missing video_id and task_id")
-
             last_data = data
             status = str(data.get("status", "")).lower()
             if status == "completed":
                 return data
             if status == "failed":
-                error = data.get("error") or "unknown error"
-                raise RuntimeError(f"Agnes video generation failed: {error}")
+                raise RuntimeError(f"Agnes video generation failed: {data.get('error') or 'unknown error'}")
             time.sleep(min(poll_interval, max(0.0, deadline - time.time())))
-
         raise TimeoutError(
-            f"Agnes video generation timed out after {timeout_seconds}s; "
+            f"Agnes {client.region} video generation timed out after {timeout_seconds}s; "
             f"last status was {last_data.get('status', 'unknown')}"
         )
 
     def execute(self, inputs: dict[str, Any]) -> ToolResult:
-        if not os.environ.get("AGNES_API_KEY"):
-            return ToolResult(success=False, error="AGNES_API_KEY not set. " + self.install_instructions)
-
         import requests
         from tools.video._shared import probe_output
 
         start = time.time()
         try:
+            client = AgnesClient(region=inputs.get("region"))
             payload = self._build_payload(inputs)
-            client = AgnesClient()
             submitted = client.post_json("/v1/videos", payload, timeout=60)
             video_id = submitted.get("video_id")
             task_id = submitted.get("task_id") or submitted.get("id")
@@ -259,13 +239,11 @@ class AgnesVideo(BaseTool):
             video_url = self._completed_url(result)
             if not video_url:
                 raise RuntimeError("Completed Agnes video response is missing metadata.url")
-
-            download = requests.get(video_url, timeout=300)
+            download = requests.get(video_url, timeout=(15, 300))
             download.raise_for_status()
             output_path = Path(inputs.get("output_path", "agnes_video_output.mp4"))
             output_path.parent.mkdir(parents=True, exist_ok=True)
             output_path.write_bytes(download.content)
-
         except Exception as exc:
             return ToolResult(success=False, error=f"Agnes video generation failed: {exc}")
 
@@ -275,6 +253,8 @@ class AgnesVideo(BaseTool):
             success=True,
             data={
                 "provider": "agnes",
+                "region": client.region,
+                "base_url": client.base_url,
                 "model": "agnes-video-v2.0",
                 "prompt": inputs["prompt"],
                 "operation": inputs.get("operation", "text_to_video"),

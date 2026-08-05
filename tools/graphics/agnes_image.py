@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
-from lib.providers.agnes import AgnesAPIError, AgnesClient
+from lib.providers.agnes import AgnesAPIError, AgnesClient, configured_agnes_regions
 from tools.base_tool import (
     BaseTool,
     Determinism,
@@ -40,7 +40,7 @@ def _file_to_data_uri(path_value: str) -> str:
 
 class AgnesImage(BaseTool):
     name = "agnes_image"
-    version = "0.1.0"
+    version = "0.2.0"
     tier = ToolTier.GENERATE
     capability = "image_generation"
     provider = "agnes"
@@ -51,17 +51,14 @@ class AgnesImage(BaseTool):
 
     dependencies = []
     install_instructions = (
-        "Set AGNES_API_KEY to an Agnes AI API key.\n"
-        "  Get one at https://platform.agnes-ai.com"
+        "Choose AGNES_REGION=cn or AGNES_REGION=global, then set the matching "
+        "AGNES_CN_API_KEY or AGNES_GLOBAL_API_KEY. AGNES_API_KEY remains supported."
     )
     agent_skills = ["flux-best-practices"]
 
     capabilities = [
-        "generate_image",
-        "edit_image",
-        "text_to_image",
-        "image_to_image",
-        "multi_image_composition",
+        "generate_image", "edit_image", "text_to_image",
+        "image_to_image", "multi_image_composition",
     ]
     supports = {
         "image_edit": True,
@@ -70,6 +67,8 @@ class AgnesImage(BaseTool):
         "resolution": True,
         "base64_input": True,
         "base64_output": True,
+        "regions": ["cn", "global"],
+        "automatic_region_failover": False,
     }
     best_for = [
         "high-information-density images and complex compositions",
@@ -84,20 +83,20 @@ class AgnesImage(BaseTool):
         "required": ["prompt"],
         "properties": {
             "prompt": {"type": "string"},
-            "generation_mode": {
+            "region": {
                 "type": "string",
-                "enum": ["generate", "edit"],
-                "default": "generate",
+                "enum": ["cn", "global"],
+                "description": "Agnes API region. Overrides AGNES_REGION for this call.",
+            },
+            "generation_mode": {
+                "type": "string", "enum": ["generate", "edit"], "default": "generate",
             },
             "model": {
-                "type": "string",
-                "enum": ["agnes-image-2.1-flash"],
+                "type": "string", "enum": ["agnes-image-2.1-flash"],
                 "default": "agnes-image-2.1-flash",
             },
             "resolution": {
-                "type": "string",
-                "enum": ["1K", "2K", "3K", "4K"],
-                "default": "1K",
+                "type": "string", "enum": ["1K", "2K", "3K", "4K"], "default": "1K",
             },
             "aspect_ratio": {
                 "type": "string",
@@ -117,33 +116,27 @@ class AgnesImage(BaseTool):
         cpu_cores=1, ram_mb=512, vram_mb=0, disk_mb=200, network_required=True
     )
     retry_policy = RetryPolicy(
-        max_retries=2,
-        retryable_errors=["rate_limit", "timeout", "server_error"],
+        max_retries=2, retryable_errors=["rate_limit", "timeout", "server_error"]
     )
-    idempotency_key_fields = ["prompt", "model", "resolution", "aspect_ratio"]
+    idempotency_key_fields = ["prompt", "model", "resolution", "aspect_ratio", "region"]
     side_effects = ["writes image file(s) to output_path", "calls Agnes AI image API"]
     user_visible_verification = ["Inspect image quality, composition, and edit fidelity"]
 
     def get_status(self) -> ToolStatus:
-        return ToolStatus.AVAILABLE if os.environ.get("AGNES_API_KEY") else ToolStatus.UNAVAILABLE
+        return ToolStatus.AVAILABLE if configured_agnes_regions() else ToolStatus.UNAVAILABLE
 
     def estimate_cost(self, inputs: dict[str, Any]) -> float:
-        per_image = float(os.environ.get("AGNES_IMAGE_COST_PER_IMAGE", "0"))
-        return per_image
+        return float(os.environ.get("AGNES_IMAGE_COST_PER_IMAGE", "0"))
 
     @staticmethod
     def _normalize_resolution(value: Any) -> str:
         normalized = str(value or "1K").upper()
-        if normalized not in _ALLOWED_RESOLUTIONS:
-            return "1K"
-        return normalized
+        return normalized if normalized in _ALLOWED_RESOLUTIONS else "1K"
 
     @staticmethod
     def _normalize_ratio(value: Any) -> str:
         normalized = str(value or "16:9")
-        if normalized not in _ALLOWED_RATIOS:
-            return "16:9"
-        return normalized
+        return normalized if normalized in _ALLOWED_RATIOS else "16:9"
 
     @staticmethod
     def _reference_images(inputs: dict[str, Any]) -> list[str]:
@@ -158,15 +151,13 @@ class AgnesImage(BaseTool):
 
     def _build_payload(self, inputs: dict[str, Any]) -> dict[str, Any]:
         images = self._reference_images(inputs)
-        mode = inputs.get("generation_mode", "generate")
-        if mode == "edit" and not images:
+        if inputs.get("generation_mode", "generate") == "edit" and not images:
             raise ValueError("Agnes image edit mode requires an input image")
-
-        response_format = "b64_json" if inputs.get("return_base64") else "url"
-        extra_body: dict[str, Any] = {"response_format": response_format}
+        extra_body: dict[str, Any] = {
+            "response_format": "b64_json" if inputs.get("return_base64") else "url"
+        }
         if images:
             extra_body["image"] = images
-
         return {
             "model": "agnes-image-2.1-flash",
             "prompt": inputs["prompt"],
@@ -192,23 +183,19 @@ class AgnesImage(BaseTool):
         return [base.parent / f"{base.name}_{index + 1}{suffix}" for index in range(count)]
 
     def execute(self, inputs: dict[str, Any]) -> ToolResult:
-        if not os.environ.get("AGNES_API_KEY"):
-            return ToolResult(success=False, error="AGNES_API_KEY not set. " + self.install_instructions)
-
         import requests
 
         start = time.time()
         try:
+            client = AgnesClient(region=inputs.get("region"))
             payload = self._build_payload(inputs)
-            response = AgnesClient().post_json("/v1/images/generations", payload, timeout=360)
+            response = client.post_json("/v1/images/generations", payload, timeout=360)
             items = response.get("data") or []
             if not isinstance(items, list) or not items:
                 return ToolResult(success=False, error="Agnes image response contained no outputs")
-
             extension = self._extension_from_url(items[0].get("url") if isinstance(items[0], dict) else None)
             output_paths = self._output_paths(inputs.get("output_path"), len(items), extension)
             outputs: list[str] = []
-
             for item, output_path in zip(items, output_paths):
                 if not isinstance(item, dict):
                     raise AgnesAPIError("Agnes image response contained an invalid output item")
@@ -216,22 +203,22 @@ class AgnesImage(BaseTool):
                 if item.get("b64_json"):
                     output_path.write_bytes(base64.b64decode(item["b64_json"]))
                 elif item.get("url"):
-                    download = requests.get(item["url"], timeout=180)
+                    download = requests.get(item["url"], timeout=(15, 180))
                     download.raise_for_status()
                     output_path.write_bytes(download.content)
                 else:
                     raise AgnesAPIError("Agnes image output is missing url and b64_json")
                 outputs.append(str(output_path))
-
         except Exception as exc:
             return ToolResult(success=False, error=f"Agnes image generation failed: {exc}")
 
-        references = self._reference_images(inputs)
-        mode = "edit" if references else "generate"
+        mode = "edit" if payload["extra_body"].get("image") else "generate"
         return ToolResult(
             success=True,
             data={
                 "provider": "agnes",
+                "region": client.region,
+                "base_url": client.base_url,
                 "model": "agnes-image-2.1-flash",
                 "prompt": inputs["prompt"],
                 "generation_mode": mode,
